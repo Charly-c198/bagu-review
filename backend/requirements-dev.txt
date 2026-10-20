@@ -1,0 +1,3 @@
+# 开发/CI 依赖：lint 不进运行镜像
+-r requirements.txt
+ruff>=0.8

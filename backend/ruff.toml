@@ -1,0 +1,6 @@
+# ruff 配置：只启用稳定、低噪音的规则；与 scripts/check.ps1、CI 同口径。
+target-version = "py313"
+line-length = 100
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I"]

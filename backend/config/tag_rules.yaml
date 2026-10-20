@@ -1,0 +1,267 @@
+# M1 种子规则：关键词 → 标签/分类/难度/频率建议。
+# 启动时若 tag_rules 表为空则自动加载；设置页可增删改。
+rules:
+  - keyword: "三次握手"
+    tags: ["TCP", "计算机网络"]
+    category_path: "后端开发/计算机网络/TCP"
+    difficulty: 3
+    frequency: high
+    weight: 1.0
+  - keyword: "四次挥手"
+    tags: ["TCP", "计算机网络"]
+    category_path: "后端开发/计算机网络/TCP"
+    difficulty: 3
+    frequency: mid
+    weight: 0.9
+  - keyword: "进程|线程"
+    match_type: regex
+    tags: ["操作系统"]
+    category_path: "后端开发/操作系统/进程管理"
+    difficulty: 2
+    frequency: high
+    weight: 0.8
+  - keyword: "死锁"
+    tags: ["操作系统", "并发"]
+    category_path: "后端开发/操作系统/并发"
+    difficulty: 4
+    frequency: mid
+    weight: 0.9
+  - keyword: "B\\+ 树|B\\+树|索引"
+    match_type: regex
+    tags: ["MySQL", "数据库"]
+    category_path: "后端开发/数据库/索引"
+    difficulty: 4
+    frequency: high
+    weight: 1.0
+  - keyword: "事务|ACID|MVCC"
+    match_type: regex
+    tags: ["数据库"]
+    category_path: "后端开发/数据库/事务"
+    difficulty: 3
+    frequency: high
+    weight: 0.9
+  - keyword: "HTTPS|TLS"
+    match_type: regex
+    tags: ["计算机网络", "HTTP"]
+    category_path: "后端开发/计算机网络/HTTP"
+    difficulty: 2
+    frequency: high
+    weight: 0.9
+  - keyword: "跨域|CORS"
+    match_type: regex
+    tags: ["前端", "网络"]
+    category_path: "前端开发/前端/网络"
+    difficulty: 2
+    frequency: high
+    weight: 0.9
+  - keyword: "事件循环|宏任务|微任务"
+    match_type: regex
+    tags: ["JavaScript"]
+    category_path: "前端开发/前端/JS"
+    difficulty: 4
+    frequency: high
+    weight: 0.9
+  - keyword: "RAG|检索增强"
+    match_type: regex
+    tags: ["Agent", "RAG"]
+    category_path: "AI-Agent/Agent/RAG"
+    difficulty: 2
+    frequency: high
+    weight: 0.9
+  - keyword: "ReAct|Function Calling|工具调用"
+    match_type: regex
+    tags: ["Agent"]
+    category_path: "AI-Agent/Agent/工具调用"
+    difficulty: 3
+    frequency: high
+    weight: 0.9
+  - keyword: "unique_ptr|shared_ptr|RAII|虚函数"
+    match_type: regex
+    tags: ["C++"]
+    category_path: "客户端C++/C++/内存"
+    difficulty: 3
+    frequency: high
+    weight: 0.9
+  - keyword: "Docker|容器|镜像"
+    match_type: regex
+    tags: ["DevOps"]
+    category_path: "运维DevOps/DevOps/容器"
+    difficulty: 2
+    frequency: high
+    weight: 0.8
+  - keyword: "CI/CD|流水线"
+    match_type: regex
+    tags: ["DevOps"]
+    category_path: "运维DevOps/DevOps/流水线"
+    difficulty: 2
+    frequency: mid
+    weight: 0.8
+  - keyword: "测试金字塔|等价类|边界值|Bug"
+    match_type: regex
+    tags: ["测试"]
+    category_path: "测试质量/测试/用例"
+    difficulty: 2
+    frequency: mid
+    weight: 0.8
+  - keyword: "排序|哈希表|LRU"
+    match_type: regex
+    tags: ["算法"]
+    category_path: "算法ML/算法/数据结构"
+    difficulty: 3
+    frequency: mid
+    weight: 0.8
+  # —— 网络与缓存通用规则（补充 65 题内容后按覆盖验收加入）——
+  - keyword: "TCP|UDP|HTTP|HTTPS|DNS|IP|TCP/IP|报文"
+    match_type: regex
+    tags: ["计算机网络"]
+    category_path: "后端开发/计算机网络/基础"
+    difficulty: 3
+    frequency: high
+    weight: 0.7
+  - keyword: 'HTTP/2|HTTP/1\.1|HTTP 缓存|Cache-Control|ETag|304|协商缓存|强缓存'
+    match_type: regex
+    tags: ["HTTP", "缓存"]
+    category_path: "后端开发/计算机网络/HTTP"
+    difficulty: 3
+    frequency: high
+    weight: 0.85
+  - keyword: "缓存穿透|缓存击穿|缓存雪崩|布隆过滤器"
+    match_type: regex
+    tags: ["Redis", "缓存", "高并发"]
+    category_path: "后端开发/缓存/缓存问题"
+    difficulty: 4
+    frequency: high
+    weight: 0.9
+  - keyword: "CIDR|子网掩码|IPv4|IPv6|网段"
+    match_type: regex
+    tags: ["计算机网络", "IP"]
+    category_path: "后端开发/计算机网络/IP"
+    difficulty: 2
+    frequency: mid
+    weight: 0.8
+  # —— 后端面经通用主题（用独立 20 题做覆盖验收后补充）——
+  - keyword: "Redis|RDB|AOF|过期键|淘汰策略"
+    match_type: regex
+    tags: ["Redis", "缓存"]
+    category_path: "后端开发/缓存/Redis"
+    difficulty: 3
+    frequency: high
+    weight: 0.9
+  - keyword: "JVM|垃圾回收|GC|类加载|堆和栈|堆与栈"
+    match_type: regex
+    tags: ["Java", "JVM"]
+    category_path: "后端开发/Java/JVM"
+    difficulty: 4
+    frequency: high
+    weight: 0.9
+  - keyword: "synchronized|ReentrantLock|volatile|CAS|AQS|并发"
+    match_type: regex
+    tags: ["Java", "并发"]
+    category_path: "后端开发/Java/并发"
+    difficulty: 4
+    frequency: high
+    weight: 0.9
+  - keyword: "Spring|IoC|AOP|Bean|事务传播"
+    match_type: regex
+    tags: ["Spring"]
+    category_path: "后端开发/Java/Spring"
+    difficulty: 3
+    frequency: high
+    weight: 0.8
+  - keyword: "InnoDB|MyISAM|隔离级别|脏读|幻读|不可重复读"
+    match_type: regex
+    tags: ["MySQL", "数据库"]
+    category_path: "后端开发/数据库/事务"
+    difficulty: 4
+    frequency: high
+    weight: 0.9
+  - keyword: "分库分表|跨库|Sharding"
+    match_type: regex
+    tags: ["MySQL", "数据库", "高并发"]
+    category_path: "后端开发/数据库/分库分表"
+    difficulty: 4
+    frequency: high
+    weight: 0.9
+  - keyword: "Kafka|RocketMQ|RabbitMQ|消息队列|重复消费|消息丢失"
+    match_type: regex
+    tags: ["消息队列"]
+    category_path: "后端开发/消息队列/基础"
+    difficulty: 3
+    frequency: high
+    weight: 0.9
+  - keyword: "限流|令牌桶|漏桶|熔断|降级|Sentinel|Hystrix"
+    match_type: regex
+    tags: ["高并发", "微服务"]
+    category_path: "后端开发/高可用/限流熔断"
+    difficulty: 3
+    frequency: high
+    weight: 0.85
+  - keyword: "服务注册|服务发现|注册中心|微服务|Eureka|Nacos"
+    match_type: regex
+    tags: ["微服务"]
+    category_path: "后端开发/微服务/服务治理"
+    difficulty: 3
+    frequency: mid
+    weight: 0.8
+  - keyword: "分布式 ID|分布式ID|snowflake|雪花算法"
+    match_type: regex
+    tags: ["分布式", "高并发"]
+    category_path: "后端开发/分布式/ID"
+    difficulty: 3
+    frequency: mid
+    weight: 0.85
+  - keyword: "幂等"
+    tags: ["分布式", "接口设计"]
+    category_path: "后端开发/分布式/幂等"
+    difficulty: 3
+    frequency: high
+    weight: 0.85
+  - keyword: "CDN"
+    match_type: regex
+    tags: ["计算机网络"]
+    category_path: "后端开发/计算机网络/CDN"
+    difficulty: 2
+    frequency: mid
+    weight: 0.7
+  - keyword: "HashMap|ConcurrentHashMap|ArrayList|LinkedList|集合类"
+    match_type: regex
+    tags: ["Java", "集合"]
+    category_path: "后端开发/Java/集合"
+    difficulty: 3
+    frequency: high
+    weight: 0.35
+  - keyword: "redo log|undo log|binlog|间隙锁|行锁|表锁|主从复制|主从延迟|慢查询|执行计划"
+    match_type: regex
+    tags: ["MySQL", "数据库"]
+    category_path: "后端开发/数据库/原理"
+    difficulty: 4
+    frequency: high
+    weight: 0.4
+  - keyword: '\bCAP\b|\bBASE\b|一致性哈希'
+    match_type: regex
+    tags: ["分布式"]
+    category_path: "后端开发/分布式/理论"
+    difficulty: 3
+    frequency: mid
+    weight: 0.4
+  - keyword: "Kubernetes|K8s|Pod|Deployment|Helm"
+    match_type: regex
+    tags: ["DevOps", "云原生"]
+    category_path: "运维DevOps/DevOps/Kubernetes"
+    difficulty: 3
+    frequency: mid
+    weight: 0.35
+  - keyword: '\bGit\b|rebase|分支管理|代码回滚'
+    match_type: regex
+    tags: ["工具", "Git"]
+    category_path: "开发工具/Git/基础"
+    difficulty: 2
+    frequency: mid
+    weight: 0.35
+  - keyword: "分布式锁"
+    match_type: regex
+    tags: ["分布式", "Redis"]
+    category_path: "后端开发/分布式/锁"
+    difficulty: 3
+    frequency: high
+    weight: 0.4

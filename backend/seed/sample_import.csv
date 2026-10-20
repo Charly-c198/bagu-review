@@ -1,0 +1,10 @@
+﻿题干,答案,标签,难度,频率
+什么是 TCP 的三次握手？,客户端发送 SYN，服务端回复 SYN+ACK，客户端再发送 ACK，双方进入 ESTABLISHED。,"TCP,计算机网络",3,high
+Java 中 ArrayList 和 LinkedList 的区别？,ArrayList 基于动态数组，随机访问 O(1)，中间插入删除要移动元素；LinkedList 基于双向链表，头尾插入删除 O(1)，随机访问 O(n)。,"Java,集合",2,mid
+,空题干应报错,,,
+进程间通信方式有哪些？,管道、消息队列、共享内存、信号量、信号、Socket 等。,"操作系统,进程",3,mid
+Redis 的过期策略有哪几种？,惰性删除：访问时判断是否过期；定期删除：周期性抽样检查。二者配合控制内存。,"Redis,缓存",3,high
+什么是死锁？,多个进程互相持有对方所需的资源并等待，导致都无法继续执行。,"操作系统,并发",2,mid
+HTTP/2 的主要改进？,二进制分帧、多路复用、头部压缩、服务器推送。,"HTTP,计算机网络",3,mid
+MySQL 中 explain 的 type 字段有哪些取值？,从好到差：system、const、eq_ref、ref、range、index、ALL。,"MySQL,索引",4,mid
+Git merge 和 rebase 的区别？,merge 保留分支历史并生成合并提交；rebase 把提交在目标分支上重放，历史线性但改写提交哈希。,"Git,工程",2,low

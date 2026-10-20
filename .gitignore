@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# 数据与备份（本地数据库不入库）
+backend/data/*.db
+backend/data/*.db-wal
+backend/data/*.db-shm
+backend/data/backups/*.db
+backend/data/crawl_cache/
+backend/data/server.log
+
+# 前端
+frontend/node_modules/
+frontend/dist/
+frontend/e2e/artifacts/
+
+# 环境与编辑器
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+.DS_Store
+*.log
