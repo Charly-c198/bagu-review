@@ -20,7 +20,7 @@
 | E | CI | ✅ `git init` + 首次提交；`.github/workflows/ci.yml`、`scripts/check.ps1` / `check.sh`、`backend/ruff.toml`、`requirements-dev.txt` |
 | F | Markdown XSS、Alembic 自动化等补测 | ✅ XSS 纯文本存储 + 前端无 `v-html` + Alembic 空库迁移；导出回环含关联确认已有测试覆盖 |
 
-**若用户说“继续做项目”**：先确认是否开始 Docker（D）；否则可做内容整理（待审区还有 147 题 / 273 知识待审）或进入 M2。
+**若用户说“继续做项目”**：先确认是否开始 Docker（D）；否则可做内容扩充（待审区已清空，需要新内容时重跑爬虫或导入）或进入 M2。
 
 ---
 
@@ -33,7 +33,8 @@
     $env:BAJIU_GITHUB_SSL="system"; & "D:\Program Files\JetBrains\PythonProject\.venv\Scripts\python.exe" run.py
     ```
   - 端口被占用但页面可打开 = 旧进程还活着，**不要直接再起一个**；改后端后先 `taskkill //PID <PID> //F` 再启动。
-- **演示数据库**：`backend/data/bajiu.db`，当前 **123 题 / 67 知识 / 46 关联 / 待审 424（150 题 + 274 知识）**。
+- **演示数据库**：`backend/data/bajiu.db`，当前 **123 题 / 67 知识 / 46 关联 / 待审 0**。
+  - 2026-10-20 已把当时积压的 424 条低置信度候选（150 题 + 274 知识）批量置为 `rejected` 并留审计记录；正式库内容不受影响，原始文件仍在 `backend/data/crawl_cache/2/`，需要时可重跑采集。
   - 爬虫来源：`doocs/advanced-java`（真实任务 2：92/92 成功）；`CyC2018/CS-Notes`（种子演示源，任务 1 为 3 个示例文件，不是真跑）。
   - 动手改库前可参考备份：`backend/data/backups/bajiu_pre_crawl_20261020.db`。
 - **前端 `dist`**：已重新构建，后端自动托管，单端口 8000 可访问。
@@ -129,7 +130,7 @@ cd ..; .\scripts\check.ps1            # 或 .\scripts\check.ps1 -WithE2E
 
 ## 5. 已知弱点（不是 bug，但要知道）
 
-- **启发式解析噪音**：无标记文章的标题会大量变成知识候选（当前 273 条爬虫知识待审），且标题脱离上下文后可能无意义（如“方法二：分治法”已过滤，但仍有“类似快排法”类）。复核时建议按置信度/来源批量拒绝。
+- **启发式解析噪音**：无标记文章的标题会大量变成知识候选（清理前 273 条爬虫知识待审，已整体拒绝），且标题脱离上下文后可能无意义（如“方法二：分治法”已过滤，但仍有“类似快排法”类）。重跑采集后建议按置信度/来源批量拒绝。
 - **SimHash 阈值 3 对中文短句太严**：差一个字常差 14+ 位，近似去重主要靠精确哈希生效。设置页可调 `dedupe.simhash_threshold`，或换字符 n-gram。
 - **规则打标**：通用主题覆盖已明显提升，但系统设计类（短链接、秒杀架构）仍可能无建议；英文面经命中率更低。
 - **真实仓库演示依赖本机代理**：`BAJIU_GITHUB_SSL=system` + 代理可用时正常；CI / 其他网络默认 `certifi` 即可。raw 域名偶发慢（实测 0.4s–22s 波动），重试机制可兜底。
