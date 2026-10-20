@@ -26,9 +26,19 @@ from ..schemas import SourceCreate, SourceUpdate
 from ..security import get_current_user
 from ..services.audit import audit
 from ..services.crawler import run_task, validate_source_url
+from ..services.nowcoder import validate_nowcoder_source
 from ..services.serializers import serialize_source, serialize_task, serialize_task_file
 
 router = APIRouter(prefix="/crawl", tags=["crawl"])
+
+
+def _validate_source_url(kind: str, url: str) -> None:
+    if kind == "github":
+        validate_source_url(url)
+    elif kind == "nowcoder":
+        validate_nowcoder_source(url)
+    else:
+        raise ApiError(400, "VALIDATION_ERROR", "source_kind 仅支持 github / nowcoder")
 
 
 @router.get("/sources")
@@ -48,6 +58,8 @@ def create_source(
 ):
     if payload.source_kind == "github":
         validate_source_url(payload.url)
+    else:
+        validate_nowcoder_source(payload.url)
     if db.scalar(select(CrawlSource).where(CrawlSource.url == payload.url)):
         raise ApiError(409, "CONFLICT", "该源 URL 已存在")
     source = CrawlSource(
@@ -81,8 +93,7 @@ def update_source(
         raise ApiError(404, "NOT_FOUND", "源不存在")
     fields = payload.model_fields_set
     if payload.url is not None and payload.url != source.url:
-        if source.source_kind == "github":
-            validate_source_url(payload.url)
+        _validate_source_url(source.source_kind, payload.url)
         if db.scalar(
             select(CrawlSource).where(
                 CrawlSource.url == payload.url, CrawlSource.id != source.id
@@ -200,8 +211,8 @@ def run_source(
         raise ApiError(404, "NOT_FOUND", "源不存在")
     if not source.enabled:
         raise ApiError(409, "CONFLICT", "该源已停用，请先启用")
-    if source.source_kind != "github":
-        raise ApiError(400, "VALIDATION_ERROR", "牛客爬虫将在 M2 提供，M1 仅支持 GitHub")
+    if source.source_kind not in ("github", "nowcoder"):
+        raise ApiError(400, "VALIDATION_ERROR", "仅支持 GitHub / 牛客公开页采集")
     task = CrawlTask(source_id=source.id, status="pending")
     db.add(task)
     db.flush()

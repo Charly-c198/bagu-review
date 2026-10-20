@@ -24,6 +24,7 @@ const editingSourceId = ref<number | null>(null)
 const sourceSaving = ref(false)
 const sourceForm = reactive({
   name: '',
+  source_kind: 'github' as 'github' | 'nowcoder',
   url: '',
   enabled: true,
   user_agent: 'InterviewReviewBot/1.0 (+personal use)',
@@ -79,8 +80,8 @@ function stopPolling(): void {
 }
 
 async function runSource(source: CrawlSource): Promise<void> {
-  if (source.source_kind !== 'github') {
-    store.toast('牛客爬虫将在 M2 提供，M1 仅支持 GitHub', 'info')
+  if (!['github', 'nowcoder'].includes(source.source_kind)) {
+    store.toast('该源类型暂不支持采集', 'info')
     return
   }
   try {
@@ -97,6 +98,7 @@ function openSourceForm(source?: CrawlSource): void {
   if (source) {
     editingSourceId.value = source.id
     sourceForm.name = source.name
+    sourceForm.source_kind = source.source_kind === 'nowcoder' ? 'nowcoder' : 'github'
     sourceForm.url = source.url
     sourceForm.enabled = source.enabled
     sourceForm.user_agent = source.user_agent
@@ -107,6 +109,7 @@ function openSourceForm(source?: CrawlSource): void {
   } else {
     editingSourceId.value = null
     sourceForm.name = ''
+    sourceForm.source_kind = 'github'
     sourceForm.url = 'https://github.com/'
     sourceForm.enabled = true
     sourceForm.user_agent = 'InterviewReviewBot/1.0 (+personal use)'
@@ -118,19 +121,34 @@ function openSourceForm(source?: CrawlSource): void {
   sourceFormOpen.value = true
 }
 
+function changeSourceKind(): void {
+  if (sourceForm.source_kind === 'nowcoder') {
+    sourceForm.url = 'https://www.nowcoder.com/'
+    sourceForm.interval_sec = 5
+    sourceForm.timeout_sec = 30
+    sourceForm.max_retries = 2
+  } else {
+    sourceForm.url = 'https://github.com/'
+    sourceForm.interval_sec = 10
+    sourceForm.timeout_sec = 15
+    sourceForm.max_retries = 3
+  }
+}
+
 async function saveSource(): Promise<void> {
   if (!sourceForm.name.trim() || !sourceForm.url.trim()) {
     store.toast('名称和 URL 不能为空', 'error')
     return
   }
   sourceSaving.value = true
-  const payload = { ...sourceForm, name: sourceForm.name.trim(), url: sourceForm.url.trim() }
+  const { source_kind, ...rest } = sourceForm
+  const payload = { ...rest, name: sourceForm.name.trim(), url: sourceForm.url.trim() }
   try {
     if (editingSourceId.value) {
       await api.patch(`/crawl/sources/${editingSourceId.value}`, payload)
       store.toast('源配置已保存', 'success')
     } else {
-      await api.post('/crawl/sources', { ...payload, source_kind: 'github' })
+      await api.post('/crawl/sources', { ...payload, source_kind })
       store.toast('源已创建', 'success')
     }
     sourceFormOpen.value = false
@@ -192,7 +210,7 @@ onBeforeUnmount(stopPolling)
 <template>
   <div>
     <div class="toolbar">
-      <span class="tag teal">M1 · GitHub Markdown</span>
+      <span class="tag teal">M2 · GitHub + 牛客公开页</span>
       <div style="flex: 1"></div>
       <button class="btn ghost sm" @click="loadSources(); loadTasks()">刷新</button>
       <button class="btn" @click="openSourceForm()">+ 新增源</button>
@@ -210,11 +228,11 @@ onBeforeUnmount(stopPolling)
         </div>
         <div class="mono" style="color: var(--ink3)">{{ source.url }}</div>
         <div style="font-size: 13.5px; color: var(--ink2)">
-          类型 {{ sourceText('crawler') }} · 间隔 {{ source.interval_sec }}s · 单次最多
+          类型 {{ source.source_kind === 'nowcoder' ? '牛客' : 'GitHub' }} · 间隔 {{ source.interval_sec }}s · 单次最多
           {{ source.max_files_per_run }} 文件 · 上次 {{ formatDateTime(source.last_run_at) }}
         </div>
         <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap">
-          <button class="btn sm" :disabled="source.source_kind !== 'github'" @click="runSource(source)">
+          <button class="btn sm" :disabled="!['github', 'nowcoder'].includes(source.source_kind)" @click="runSource(source)">
             立即采集
           </button>
           <button class="btn ghost sm" @click="openSourceForm(source)">配置</button>
@@ -279,16 +297,38 @@ onBeforeUnmount(stopPolling)
       </table>
     </div>
 
-    <Modal :open="sourceFormOpen" :title="editingSourceId ? '编辑爬虫源' : '新增 GitHub 源'" @close="sourceFormOpen = false">
+    <Modal :open="sourceFormOpen" :title="editingSourceId ? '编辑爬虫源' : '新增采集源'" @close="sourceFormOpen = false">
       <div class="form-grid">
+        <div class="field full">
+          <label>来源类型</label>
+          <select
+            v-model="sourceForm.source_kind"
+            class="select"
+            :disabled="!!editingSourceId"
+            @change="changeSourceKind"
+          >
+            <option value="github">GitHub 仓库 / 目录 / raw Markdown</option>
+            <option value="nowcoder">牛客公开帖子 / sitemap</option>
+          </select>
+          <span class="hint">牛客仅采集公开页面，遵守 robots.txt 与请求间隔；不支持登录态/付费内容。</span>
+        </div>
         <div class="field full">
           <label>名称</label>
           <input v-model="sourceForm.name" class="input" placeholder="GitHub · CS-Notes 面经仓库" />
         </div>
         <div class="field full">
-          <label>仓库 / 目录 / raw URL</label>
-          <input v-model="sourceForm.url" class="input" placeholder="https://github.com/owner/repo 或 /tree/main/docs" />
-          <span class="hint">仅允许 github.com / raw.githubusercontent.com；支持可选 GITHUB_TOKEN 环境变量。</span>
+          <label>{{ sourceForm.source_kind === 'nowcoder' ? '帖子 / sitemap URL' : '仓库 / 目录 / raw URL' }}</label>
+          <input
+            v-model="sourceForm.url"
+            class="input"
+            :placeholder="sourceForm.source_kind === 'nowcoder'
+              ? 'https://www.nowcoder.com/discuss/123 或 /sitemap1.xml'
+              : 'https://github.com/owner/repo 或 /tree/main/docs'"
+          />
+          <span v-if="sourceForm.source_kind === 'nowcoder'" class="hint">
+            支持单个公开帖子或站点 sitemap（sitemap 会批量列出公开帖子）；列表页为动态渲染，不支持直接配置。
+          </span>
+          <span v-else class="hint">仅允许 github.com / raw.githubusercontent.com；支持可选 GITHUB_TOKEN 环境变量。</span>
         </div>
         <div class="field full">
           <label>请求 User-Agent</label>

@@ -31,6 +31,8 @@ from ..services.categories import (
     descendant_ids,
     get_or_create_category_path,
 )
+from ..services.filters import apply_multi_filters, parse_int_list, parse_str_list
+from ..services.fts import search_question_ids
 from ..services.serializers import serialize_pending, serialize_question
 from ..services.settings_service import get_settings
 from ..services.tagging import suggest_meta
@@ -100,6 +102,14 @@ def list_questions(
     frequency: str | None = None,
     mastery: str | None = None,
     source_type: str | None = None,
+    # M2 多维筛选：逗号分隔，维度间 AND、维度内 OR。
+    category_ids: str | None = None,
+    tag_ids: str | None = None,
+    company_ids: str | None = None,
+    difficulties: str | None = None,
+    frequencies: str | None = None,
+    sources: str | None = None,
+    masteries: str | None = None,
     status: str = "active",
     include_deleted: bool = False,
     page: int = Query(default=1, ge=1),
@@ -158,20 +168,39 @@ def list_questions(
         )
     if q:
         pattern = f"%{q}%"
-        stmt = stmt.where(
-            or_(
-                Question.stem.like(pattern),
-                Question.answer.like(pattern),
-                Question.notes.like(pattern),
-                Question.id.in_(
-                    select(QuestionTag.question_id)
-                    .join(Tag, Tag.id == QuestionTag.tag_id)
-                    .where(Tag.name.like(pattern))
-                ),
-            )
+        tag_hits = (
+            select(QuestionTag.question_id)
+            .join(Tag, Tag.id == QuestionTag.tag_id)
+            .where(Tag.name.like(pattern))
         )
+        fts_ids = search_question_ids(db, q)
+        if fts_ids is None:
+            stmt = stmt.where(
+                or_(
+                    Question.stem.like(pattern),
+                    Question.answer.like(pattern),
+                    Question.notes.like(pattern),
+                    Question.id.in_(tag_hits),
+                )
+            )
+        else:
+            stmt = stmt.where(
+                or_(Question.id.in_(fts_ids), Question.id.in_(tag_hits))
+            )
     if mastery:
         stmt = _apply_mastery_filter(stmt, mastery)
+
+    stmt = apply_multi_filters(
+        stmt,
+        db,
+        category_ids=parse_int_list(category_ids),
+        tag_ids=parse_int_list(tag_ids),
+        company_ids=parse_int_list(company_ids),
+        difficulties=parse_int_list(difficulties),
+        frequencies=parse_str_list(frequencies),
+        sources=parse_str_list(sources),
+        masteries=parse_str_list(masteries),
+    )
 
     total = int(
         db.scalar(select(func.count()).select_from(stmt.subquery())) or 0

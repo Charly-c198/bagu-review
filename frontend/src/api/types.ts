@@ -271,3 +271,53 @@ export interface TagRule {
   enabled: boolean
   created_at: string
 }
+
+export interface HeatmapDay {
+  date: string
+  weekday: number
+  reviews: number
+  correct: number
+  accuracy: number | null
+}
+
+export interface ReviewHeatmap {
+  definitions_version: string
+  days: number
+  total_reviews: number
+  active_days: number
+  items: HeatmapDay[]
+}
+
+export interface CategoryMasteryRow {
+  label: string
+  mastered: number
+  familiar: number
+  unfamiliar: number
+  unlearned: number
+  total: number
+}
+
+export interface GraphNode {
+  id: string
+  type: 'knowledge' | 'question'
+  label: string
+  kind: string
+  category_path: string
+  mastery?: string
+}
+
+export interface GraphEdge {
+  id: string
+  source: string
+  target: string
+  type: 'co_occurrence' | 'question_knowledge'
+  relation: string
+  weight: number
+}
+
+export interface KnowledgeGraph {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+  stats: { knowledge: number; questions: number; edges: number }
+  definitions_version: string
+}

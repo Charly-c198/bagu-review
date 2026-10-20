@@ -64,5 +64,7 @@ def session_scope() -> Generator[Session, None, None]:
 def init_db() -> None:
     # 延迟导入，确保所有模型已注册到 Base.metadata。
     from . import models  # noqa: F401
+    from .services.fts import ensure_fts
 
     Base.metadata.create_all(bind=engine)
+    ensure_fts(engine, force=True)

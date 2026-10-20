@@ -5,6 +5,7 @@ import { api, withQuery } from '../api/client'
 import type { Question } from '../api/types'
 import DifficultyBars from '../components/DifficultyBars.vue'
 import Modal from '../components/Modal.vue'
+import MultiSelect from '../components/MultiSelect.vue'
 import Pagination from '../components/Pagination.vue'
 import { useAppStore } from '../stores/app'
 import {
@@ -27,11 +28,40 @@ const pageSize = 20
 const loading = ref(true)
 
 const search = ref('')
-const difficulty = ref('')
-const frequency = ref('')
-const source = ref('')
-const mastery = ref('')
+const difficulties = ref<string[]>([])
+const frequencies = ref<string[]>([])
+const sources = ref<string[]>([])
+const masteries = ref<string[]>([])
+const tagIds = ref<string[]>([])
+const companyIds = ref<string[]>([])
 const status = ref('active')
+
+const tagOptions = ref<{ value: string; label: string }[]>([])
+const companyOptions = ref<{ value: string; label: string }[]>([])
+
+const difficultyOptions = [
+  { value: '1', label: '1 入门' },
+  { value: '2', label: '2' },
+  { value: '3', label: '3' },
+  { value: '4', label: '4' },
+  { value: '5', label: '5 困难' },
+]
+const frequencyOptions = [
+  { value: 'high', label: '高频' },
+  { value: 'mid', label: '中频' },
+  { value: 'low', label: '低频' },
+]
+const sourceOptions = [
+  { value: 'crawler', label: '爬虫' },
+  { value: 'import', label: '导入' },
+  { value: 'manual', label: '手动' },
+]
+const masteryOptions = [
+  { value: 'unlearned', label: '未学' },
+  { value: 'unfamiliar', label: '不熟' },
+  { value: 'familiar', label: '熟悉' },
+  { value: 'mastered', label: '精通' },
+]
 
 const detail = ref<Question | null>(null)
 const detailOpen = ref(false)
@@ -84,10 +114,12 @@ async function load(): Promise<void> {
       withQuery('/questions', {
         category_id: store.boardParam,
         q: search.value.trim() || undefined,
-        difficulty: difficulty.value || undefined,
-        frequency: frequency.value || undefined,
-        source_type: source.value || undefined,
-        mastery: mastery.value || undefined,
+        tag_ids: tagIds.value.join(',') || undefined,
+        company_ids: companyIds.value.join(',') || undefined,
+        difficulties: difficulties.value.join(',') || undefined,
+        frequencies: frequencies.value.join(',') || undefined,
+        sources: sources.value.join(',') || undefined,
+        masteries: masteries.value.join(',') || undefined,
         status: status.value,
         page: page.value,
         page_size: pageSize,
@@ -255,7 +287,40 @@ async function remove(question: Question): Promise<void> {
   }
 }
 
-onMounted(load)
+async function loadOptions(): Promise<void> {
+  try {
+    const [tags, companies] = await Promise.all([
+      api.get<{ id: number; name: string; question_count: number }[]>('/tags'),
+      api.get<{ id: number; name: string; question_count: number }[]>('/companies'),
+    ])
+    tagOptions.value = tags.map((tag) => ({
+      value: String(tag.id),
+      label: `${tag.name} (${tag.question_count})`,
+    }))
+    companyOptions.value = companies.map((company) => ({
+      value: String(company.id),
+      label: `${company.name} (${company.question_count})`,
+    }))
+  } catch {
+    // 选项加载失败不阻塞题库列表。
+  }
+}
+
+function resetFilters(): void {
+  search.value = ''
+  difficulties.value = []
+  frequencies.value = []
+  sources.value = []
+  masteries.value = []
+  tagIds.value = []
+  companyIds.value = []
+  applySearch()
+}
+
+onMounted(() => {
+  load()
+  loadOptions()
+})
 watch(
   () => store.boardId,
   () => {
@@ -270,39 +335,49 @@ watch(
     <div class="toolbar">
       <input v-model="search" placeholder="搜索题干 / 答案 / 标签" @keyup.enter="applySearch" />
       <button class="btn ghost sm" @click="applySearch">搜索</button>
-      <select v-model="difficulty" @change="applySearch">
-        <option value="">全部难度</option>
-        <option value="1">1 入门</option>
-        <option value="2">2</option>
-        <option value="3">3</option>
-        <option value="4">4</option>
-        <option value="5">5 困难</option>
-      </select>
-      <select v-model="frequency" @change="applySearch">
-        <option value="">全部频率</option>
-        <option value="high">高频</option>
-        <option value="mid">中频</option>
-        <option value="low">低频</option>
-      </select>
-      <select v-model="source" @change="applySearch">
-        <option value="">全部来源</option>
-        <option value="crawler">爬虫</option>
-        <option value="import">导入</option>
-        <option value="manual">手动</option>
-      </select>
-      <select v-model="mastery" @change="applySearch">
-        <option value="">全部掌握度</option>
-        <option value="unlearned">未学</option>
-        <option value="unfamiliar">不熟</option>
-        <option value="familiar">熟悉</option>
-        <option value="mastered">精通</option>
-      </select>
+      <MultiSelect
+        v-model="difficulties"
+        :options="difficultyOptions"
+        placeholder="全部难度"
+        @update:model-value="applySearch"
+      />
+      <MultiSelect
+        v-model="frequencies"
+        :options="frequencyOptions"
+        placeholder="全部频率"
+        @update:model-value="applySearch"
+      />
+      <MultiSelect
+        v-model="sources"
+        :options="sourceOptions"
+        placeholder="全部来源"
+        @update:model-value="applySearch"
+      />
+      <MultiSelect
+        v-model="masteries"
+        :options="masteryOptions"
+        placeholder="全部掌握度"
+        @update:model-value="applySearch"
+      />
+      <MultiSelect
+        v-model="tagIds"
+        :options="tagOptions"
+        placeholder="全部标签"
+        @update:model-value="applySearch"
+      />
+      <MultiSelect
+        v-model="companyIds"
+        :options="companyOptions"
+        placeholder="全部公司"
+        @update:model-value="applySearch"
+      />
       <select v-model="status" @change="applySearch">
         <option value="active">正式题</option>
         <option value="draft">草稿</option>
         <option value="archived">已归档</option>
         <option value="all">全部状态</option>
       </select>
+      <button class="btn ghost sm" @click="resetFilters">重置</button>
       <div style="flex: 1"></div>
       <button class="btn" @click="openCreate">+ 新建题目</button>
     </div>

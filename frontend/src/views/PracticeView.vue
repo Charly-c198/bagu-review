@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 import { api } from '../api/client'
 import type { Question } from '../api/types'
+import MultiSelect from '../components/MultiSelect.vue'
 import { useAppStore } from '../stores/app'
 import {
   formatDate,
@@ -26,13 +27,61 @@ const finished = ref(false)
 const loading = ref(false)
 const rating = ref(false)
 
-const difficulty = ref('')
-const frequency = ref('')
-const source = ref('')
-const mastery = ref('')
+const difficulties = ref<string[]>([])
+const frequencies = ref<string[]>([])
+const sources = ref<string[]>([])
+const masteries = ref<string[]>([])
+const tagIds = ref<string[]>([])
+const companyIds = ref<string[]>([])
+const tagOptions = ref<{ value: string; label: string }[]>([])
+const companyOptions = ref<{ value: string; label: string }[]>([])
+
+const difficultyOptions = [
+  { value: '1', label: '1 入门' },
+  { value: '2', label: '2' },
+  { value: '3', label: '3' },
+  { value: '4', label: '4' },
+  { value: '5', label: '5 困难' },
+]
+const frequencyOptions = [
+  { value: 'high', label: '高频' },
+  { value: 'mid', label: '中频' },
+  { value: 'low', label: '低频' },
+]
+const sourceOptions = [
+  { value: 'crawler', label: '爬虫' },
+  { value: 'import', label: '导入' },
+  { value: 'manual', label: '手动' },
+]
+const masteryOptions = [
+  { value: 'unlearned', label: '未学' },
+  { value: 'unfamiliar', label: '只看不熟' },
+  { value: 'familiar', label: '熟悉' },
+  { value: 'mastered', label: '精通' },
+]
+
 const limit = ref(20)
 const fixedQuery = typeof route.query.q === 'string' ? route.query.q : ''
 const onlyMistakes = route.query.only_mistakes === '1'
+
+async function loadOptions(): Promise<void> {
+  try {
+    const [tags, companies] = await Promise.all([
+      api.get<{ id: number; name: string; question_count: number }[]>('/tags'),
+      api.get<{ id: number; name: string; question_count: number }[]>('/companies'),
+    ])
+    tagOptions.value = tags.map((tag) => ({
+      value: String(tag.id),
+      label: `${tag.name} (${tag.question_count})`,
+    }))
+    companyOptions.value = companies.map((company) => ({
+      value: String(company.id),
+      label: `${company.name} (${company.question_count})`,
+    }))
+  } catch {
+    // 选项加载失败不影响组卷。
+  }
+}
 
 const current = computed(() => queue.value[index.value] || null)
 const currentDetail = computed(() => detail.value || current.value)
@@ -47,14 +96,16 @@ async function start(): Promise<void> {
   try {
     const data = await api.post<{ items: Question[] }>('/practice/quiz', {
       category_id: store.boardParam,
-      difficulty: difficulty.value ? Number(difficulty.value) : undefined,
-      frequency: frequency.value || undefined,
-      source_type: source.value || undefined,
-      mastery: mastery.value || undefined,
+      difficulties: difficulties.value.map(Number),
+      frequencies: frequencies.value,
+      sources: sources.value,
+      masteries: masteries.value,
+      tag_ids: tagIds.value.map(Number),
+      company_ids: companyIds.value.map(Number),
       q: fixedQuery || undefined,
       limit: limit.value,
       mode: 'practice',
-      exclude_mastered: mastery.value ? false : true,
+      exclude_mastered: masteries.value.length ? false : true,
       only_mistakes: onlyMistakes,
     })
     queue.value = data.items
@@ -111,7 +162,10 @@ async function rate(q: number): Promise<void> {
   }
 }
 
-onMounted(start)
+onMounted(() => {
+  start()
+  loadOptions()
+})
 watch(() => store.boardId, start)
 </script>
 
@@ -119,33 +173,12 @@ watch(() => store.boardId, start)
   <div>
     <div class="practice-stage">
       <div class="toolbar" style="justify-content: center">
-        <select v-model="difficulty" class="select" style="width: auto" @change="start">
-          <option value="">全部难度</option>
-          <option value="1">1 入门</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
-          <option value="5">5 困难</option>
-        </select>
-        <select v-model="frequency" class="select" style="width: auto" @change="start">
-          <option value="">全部频率</option>
-          <option value="high">高频</option>
-          <option value="mid">中频</option>
-          <option value="low">低频</option>
-        </select>
-        <select v-model="source" class="select" style="width: auto" @change="start">
-          <option value="">全部来源</option>
-          <option value="crawler">爬虫</option>
-          <option value="import">导入</option>
-          <option value="manual">手动</option>
-        </select>
-        <select v-model="mastery" class="select" style="width: auto" @change="start">
-          <option value="">全部掌握度</option>
-          <option value="unlearned">未学</option>
-          <option value="unfamiliar">只看不熟</option>
-          <option value="familiar">熟悉</option>
-          <option value="mastered">精通</option>
-        </select>
+        <MultiSelect v-model="difficulties" :options="difficultyOptions" placeholder="全部难度" @update:model-value="start" />
+        <MultiSelect v-model="frequencies" :options="frequencyOptions" placeholder="全部频率" @update:model-value="start" />
+        <MultiSelect v-model="sources" :options="sourceOptions" placeholder="全部来源" @update:model-value="start" />
+        <MultiSelect v-model="masteries" :options="masteryOptions" placeholder="全部掌握度" @update:model-value="start" />
+        <MultiSelect v-model="tagIds" :options="tagOptions" placeholder="全部标签" width="150px" @update:model-value="start" />
+        <MultiSelect v-model="companyIds" :options="companyOptions" placeholder="全部公司" width="150px" @update:model-value="start" />
         <select v-model.number="limit" class="select" style="width: auto" @change="start">
           <option :value="10">10 题</option>
           <option :value="20">20 题</option>

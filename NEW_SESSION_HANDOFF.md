@@ -1,5 +1,7 @@
 # 八股文智能复习系统 · 新会话开场文档
 
+> M2（牛客爬虫 / FTS5 / 统计增强 / 多维筛选 / 知识图谱基础版）的进度、接口与待办见 **`M2_HANDOFF.md`**（2026-10-20）。
+
 > 写给：同项目上一位会话的接替者（下一位开发者或 AI）。
 > 最后核实：**2026-10-20（第二轮）**。本文所有断言都在当天对代码 / 数据库 / 测试实测过；没核实的事情会明确写“未核实”。
 
@@ -7,9 +9,9 @@
 
 ## 0. 30 秒结论
 
-项目 `D:\Program Files\JetBrains\PythonProject\bajiu-review` 是 M1（P0）基线：Vue3 + FastAPI + SQLite，功能闭环能跑，测试全绿。
+项目 `D:\Program Files\JetBrains\PythonProject\bajiu-review` 是 Vue3 + FastAPI + SQLite 的本地优先复习系统。
 
-**上一轮遗留的 A/B/C/E/F 已完成；只剩 D（Docker Compose 实跑）按用户要求暂缓。**
+**M1（P0）基线与 M2 指定范围（牛客爬虫、FTS5、统计增强、多维筛选、知识图谱基础版）均已完成，测试全绿；只剩 D（Docker Compose 实跑）与 M2 明确排除的定时调度 / xlsx / PostgreSQL 按用户要求暂缓。**
 
 | # | 未完成项 | 状态 |
 |---|---|---|
@@ -19,8 +21,9 @@
 | D | Docker Compose 实跑 | ⏸ 用户明确暂缓，配置已就绪 |
 | E | CI | ✅ `git init` + 首次提交；`.github/workflows/ci.yml`、`scripts/check.ps1` / `check.sh`、`backend/ruff.toml`、`requirements-dev.txt` |
 | F | Markdown XSS、Alembic 自动化等补测 | ✅ XSS 纯文本存储 + 前端无 `v-html` + Alembic 空库迁移；导出回环含关联确认已有测试覆盖 |
+| G | M2 指定范围 | ✅ 牛客爬虫 + FTS5 + 统计可视化 + 多维筛选 + 知识图谱基础版，详见 `M2_HANDOFF.md` |
 
-**若用户说“继续做项目”**：先确认是否开始 Docker（D）；否则可做内容扩充（待审区已清空，需要新内容时重跑爬虫或导入）或进入 M2。
+**若用户说“继续做项目”**：可开始 Docker（D）、内容扩充（重跑爬虫/导入），或按 `M2_HANDOFF.md` §4 的可选增强继续（手工知识关系表、更多统计维度等）。
 
 ---
 
@@ -38,7 +41,7 @@
   - 爬虫来源：`doocs/advanced-java`（真实任务 2：92/92 成功）；`CyC2018/CS-Notes`（种子演示源，任务 1 为 3 个示例文件，不是真跑）。
   - 动手改库前可参考备份：`backend/data/backups/bajiu_pre_crawl_20261020.db`。
 - **前端 `dist`**：已重新构建，后端自动托管，单端口 8000 可访问。
-- **git**：已初始化并完成首次提交；之后改动可用 `git status` / `git diff` 回看。
+- **git**：已初始化并完成 M1/M2 提交；之后改动可用 `git status` / `git diff` 回看。
 - **Docker Desktop 未启动**，按用户要求暂缓。
 
 ---
@@ -60,7 +63,7 @@ cd ..\frontend; npm run build; npm run e2e
 cd ..; .\scripts\check.ps1            # 或 .\scripts\check.ps1 -WithE2E
 ```
 
-基线（2026-10-20 第二轮实测）：**后端 54 passed（约 45s）**，`ruff check app tests` 通过，`vue-tsc + vite build` 通过，E2E `problems: []`。
+基线（2026-10-20 M2 收尾实测）：**后端 65 passed（约 56s）**，`ruff check app tests` 通过，`vue-tsc + vite build` 通过，E2E `problems: []`（含多选筛选与图谱交互断言）。M2 细节见 `M2_HANDOFF.md`。
 
 默认账号 `admin / admin123`。
 
@@ -82,6 +85,7 @@ cd ..; .\scripts\check.ps1            # 或 .\scripts\check.ps1 -WithE2E
 9. **Markdown 解析**：
    - 有 `## 题目：` / `## 知识：` 标记时走结构化解析；`---` 主题分隔线会结束当前块，未知 `**字段**` 收进题目笔记（不要再并入“频率”等字段）。
    - **无标记**时走 `parse_free_markdown`：标题像问题→题（正文为答案），“面试题”小节逐句拆题，其余标题→知识候选，全部低置信度（0.35–0.5），待审区置顶。这把真实文章仓库从“0 条产出”变成可用候选，但会带来较多低质知识候选，需要人工拒绝。
+10. **M2 约定**：`init_db()` 必须 `ensure_fts(force=True)`；trigram 查询 <3 字回退 `LIKE`；牛客必须用默认爬虫 UA（浏览器 UA 只拿 SPA 壳）；多维筛选维度间 AND、维度内 OR；图谱聚焦只返回一跳邻居。完整坑表见 `M2_HANDOFF.md` §5。
 
 ---
 
@@ -137,6 +141,7 @@ cd ..; .\scripts\check.ps1            # 或 .\scripts\check.ps1 -WithE2E
 - **错题本导出**：只导出 Markdown，不可回环导入（设计如此）。
 - **种子演示数据**：`CyC2018/CS-Notes` 源与任务 1 是演示数据（3 个示例文件），不代表真实采集；真实采集看 `advanced-java` 的任务 2。
 - **性能**：500 题 11 条 SQL / 约 36ms 是 TestClient 口径，不是真实浏览器端到端。
+- **M2 边界**：FTS 在 5000 题规模未压测；2 字中文查询回退 `LIKE`（数据量大时较慢）。知识图谱只有“共现边”，没有手工前置知识关系；前端力导向为同步计算，节点 ≥120 时首屏可能卡顿。牛客只支持公开帖/sitemap（索引只递归一层），不支持登录态、付费内容与 SPA 列表页。
 - **Windows 终端中文乱码**：显示编码问题，浏览器和 JSON 正常。
 - **未覆盖**：数据库 schema 与文档第 7 章逐字段比对、全部 API 与文档第 9 章逐条比对（上一份 HANDOFF 的清单大体可信，但不是验收结论）。
 
@@ -164,9 +169,11 @@ bajiu-review/
 │     ├─ test_tagging_coverage.py  ← 新增：1.3 独立 20 题验收
 │     ├─ test_ops.py               ← 新增：XSS / v-html / Alembic
 │     ├─ test_parsers.py           ← 新增：分隔线/自由 Markdown 用例
-│     └─ …（全量 54 passed）
-└─ frontend/                       ← 无代码改动；已重新 build + E2E
+│     └─ …（全量 65 passed，M2 细节见 `M2_HANDOFF.md`）
+└─ frontend/                       ← M1 无代码改动；M2 改动见下一行
 ```
+
+M2 新增 / 修改的文件地图见 `M2_HANDOFF.md` §6（`nowcoder.py`、`fts.py`、`filters.py`、`routers/graph.py`、`GraphView.vue`、`MultiSelect.vue` 等）。
 
 ---
 
@@ -174,9 +181,11 @@ bajiu-review/
 
 ```text
 项目在 D:\Program Files\JetBrains\PythonProject\bajiu-review。
-请先读 NEW_SESSION_HANDOFF.md（最新状态与未完成项），需要细节时再查 docs/ 下的项目文档 V0.4。
-当前：后端 54 passed、ruff 通过、前端 build/E2E 通过；A/B/C/E/F 已完成，只剩 Docker 暂缓。
-真实爬虫演示：doocs/advanced-java（92/92 文件，465 条解析）；演示库 123 题 / 67 知识 / 46 关联。
-下一步我想做的是：<例如：开始 Docker 实跑 / 整理待审区 / 进入 M2>。
-注意：后端 127.0.0.1:8000，admin/admin123；本机跑爬虫要设 BAJIU_GITHUB_SSL=system；改后端后先结束旧 uvicorn；npm 安装用官方 registry；工作区已是 git 仓库，改动可回看。
+请先读 M2_HANDOFF.md（M2 最新状态、运行方式、坑与可选增强），M1 背景与验收口径见 NEW_SESSION_HANDOFF.md。
+当前：M1 + M2 指定范围（牛客爬虫 / FTS5 / 统计增强 / 多维筛选 / 知识图谱基础版）已完成；
+后端 65 passed、ruff 通过、前端 build/E2E 通过；只剩 Docker 按用户要求暂缓。
+真实爬虫演示：doocs/advanced-java（92/92 文件，465 条解析）；演示库 123 题 / 67 知识 / 46 关联 / 待审 0。
+下一步我想做的是：<例如：开始 Docker 实跑 / 内容扩充 / 知识关系表与图谱增强 / 性能压测>。
+注意：后端 127.0.0.1:8000，admin/admin123；本机爬虫要设 BAJIU_GITHUB_SSL=system；
+牛客必须用爬虫 UA（浏览器 UA 只能拿到 SPA 壳）；FTS 短查询会回退 LIKE；改后端后先结束旧 uvicorn；npm 安装用官方 registry。
 ```

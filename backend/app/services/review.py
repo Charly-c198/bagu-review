@@ -542,3 +542,85 @@ def unfamiliar_distribution(db: Session, category_id: int | None = None) -> list
     result = [{"label": k, "value": v} for k, v in grouped.items()]
     result.sort(key=lambda x: (-x["value"], x["label"]))
     return result
+
+
+def review_heatmap(db: Session, days: int = 30, category_id: int | None = None) -> dict[str, Any]:
+    """近 N 天每日自评次数/正确率，供日历热力图使用（本地日期）。"""
+    days = max(7, min(days, 180))
+    questions = _active_questions(db, category_id)
+    ids = [q.id for q in questions]
+    start_day = local_today() - timedelta(days=days - 1)
+    start_utc, _ = local_day_bounds_utc(start_day)
+    stmt = select(MasteryRecord).where(MasteryRecord.created_at >= start_utc)
+    if ids:
+        stmt = stmt.where(MasteryRecord.question_id.in_(ids))
+    else:
+        stmt = stmt.where(MasteryRecord.id == -1)
+    buckets: dict[str, list[int]] = {}
+    for record in db.scalars(stmt).all():
+        buckets.setdefault(local_date_str(record.created_at), []).append(record.q)
+    items = []
+    for offset in range(days):
+        day = start_day + timedelta(days=offset)
+        key = day.isoformat()
+        scores = buckets.get(key, [])
+        correct = sum(1 for q in scores if q >= 3)
+        items.append(
+            {
+                "date": key,
+                "weekday": day.weekday(),
+                "reviews": len(scores),
+                "correct": correct,
+                "accuracy": round(correct / len(scores) * 100, 1) if scores else None,
+            }
+        )
+    total = sum(item["reviews"] for item in items)
+    active_days = sum(1 for item in items if item["reviews"])
+    return {
+        "definitions_version": DEFINITIONS_VERSION,
+        "days": days,
+        "total_reviews": total,
+        "active_days": active_days,
+        "items": items,
+    }
+
+
+def category_mastery(db: Session, category_id: int | None = None) -> list[dict]:
+    """按技术栈/知识点汇总掌握度，供堆叠条形图使用。"""
+    questions = _active_questions(db, category_id)
+    ids = [q.id for q in questions]
+    if not ids:
+        return []
+    schedules = {
+        s.question_id: s
+        for s in db.scalars(
+            select(ReviewSchedule).where(ReviewSchedule.question_id.in_(ids))
+        ).all()
+    }
+    rows = db.execute(
+        select(QuestionCategory.question_id, QuestionCategory.category_id)
+        .where(QuestionCategory.question_id.in_(ids))
+        .order_by(QuestionCategory.question_id, QuestionCategory.category_id)
+    ).all()
+    primary: dict[int, int] = {}
+    for question_id, category_id_value in rows:
+        primary.setdefault(question_id, category_id_value)
+    cmap = category_map(db)
+    grouped: dict[str, dict[str, int]] = {}
+    for question_id, category_id_value in primary.items():
+        path = category_path(category_id_value, cmap)
+        parts = path.split("/")
+        label = parts[1] if len(parts) >= 2 else parts[0]
+        schedule = schedules.get(question_id)
+        mastery = mastery_from_q(schedule.last_q if schedule else None)
+        bucket = grouped.setdefault(
+            label,
+            {"mastered": 0, "familiar": 0, "unfamiliar": 0, "unlearned": 0},
+        )
+        bucket[mastery] += 1
+    result = [
+        {"label": label, **counts, "total": sum(counts.values())}
+        for label, counts in grouped.items()
+    ]
+    result.sort(key=lambda item: (-item["total"], item["label"]))
+    return result[:10]

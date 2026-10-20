@@ -147,6 +147,14 @@ class QuizRequest(BaseModel):
     frequency: Frequency | None = None
     mastery: str | None = None
     source_type: str | None = None
+    # M2 多维筛选：维度间 AND、维度内 OR。
+    category_ids: list[int] = Field(default_factory=list)
+    tag_ids: list[int] = Field(default_factory=list)
+    company_ids: list[int] = Field(default_factory=list)
+    difficulties: list[int] = Field(default_factory=list)
+    frequencies: list[str] = Field(default_factory=list)
+    sources: list[str] = Field(default_factory=list)
+    masteries: list[str] = Field(default_factory=list)
     q: str | None = None
     limit: int = Field(default=20, ge=1, le=200)
     mode: Literal["practice", "sprint"] = "practice"

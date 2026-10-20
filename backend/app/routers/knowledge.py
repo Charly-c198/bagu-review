@@ -21,6 +21,8 @@ from ..services.categories import (
     descendant_ids,
     get_or_create_category_path,
 )
+from ..services.filters import parse_int_list, parse_str_list
+from ..services.fts import search_knowledge_ids
 from ..services.serializers import serialize_knowledge, serialize_pending
 from ..services.tagging import suggest_meta
 from ..utils.text import knowledge_hash, normalize_text, simhash64, truncate
@@ -40,6 +42,8 @@ def list_knowledge(
     q: str | None = None,
     category_id: int | None = None,
     kind: str | None = None,
+    category_ids: str | None = None,
+    kinds: str | None = None,
     status: str = "active",
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -53,21 +57,38 @@ def list_knowledge(
         stmt = stmt.where(KnowledgePoint.status == status)
     if kind:
         stmt = stmt.where(KnowledgePoint.kind == kind)
+    kind_values = parse_str_list(kinds)
+    if kind_values:
+        stmt = stmt.where(KnowledgePoint.kind.in_(kind_values))
     if category_id:
         ids = descendant_ids(db, category_id)
         if not ids:
             stmt = stmt.where(KnowledgePoint.id == -1)
         else:
             stmt = stmt.where(KnowledgePoint.category_id.in_(ids))
+    selected_categories = parse_int_list(category_ids)
+    if selected_categories:
+        ids = []
+        for selected in selected_categories:
+            ids.extend(descendant_ids(db, selected))
+        ids = list(dict.fromkeys(ids))
+        if not ids:
+            stmt = stmt.where(KnowledgePoint.id == -1)
+        else:
+            stmt = stmt.where(KnowledgePoint.category_id.in_(ids))
     if q:
         pattern = f"%{q}%"
-        stmt = stmt.where(
-            or_(
-                KnowledgePoint.title.like(pattern),
-                KnowledgePoint.content.like(pattern),
-                KnowledgePoint.aliases.like(pattern),
+        fts_ids = search_knowledge_ids(db, q)
+        if fts_ids is None:
+            stmt = stmt.where(
+                or_(
+                    KnowledgePoint.title.like(pattern),
+                    KnowledgePoint.content.like(pattern),
+                    KnowledgePoint.aliases.like(pattern),
+                )
             )
-        )
+        else:
+            stmt = stmt.where(KnowledgePoint.id.in_(fts_ids))
     total = int(db.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
     rows = db.scalars(
         stmt.order_by(KnowledgePoint.updated_at.desc(), KnowledgePoint.id.desc())

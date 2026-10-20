@@ -26,6 +26,68 @@ async function nav(name) {
   await page.waitForTimeout(500)
 }
 
+async function createTempPending() {
+  const ids = await page.evaluate(async () => {
+    const token = localStorage.getItem('bajiu_token')
+    const created = []
+    for (const index of [1, 2]) {
+      const response = await fetch('/api/v1/knowledge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: `E2E 待审条目 ${Date.now()}-${index}`,
+          content: '用于端到端冒烟测试的临时知识条目，测试结束后自动拒绝。',
+          send_to_pending: true,
+        }),
+      })
+      const payload = await response.json()
+      if (payload?.data?.item?.id) created.push(payload.data.item.id)
+    }
+    return created
+  })
+  return ids
+}
+
+async function rejectPending(ids) {
+  for (const id of ids || []) {
+    await page.evaluate(async (itemId) => {
+      const token = localStorage.getItem('bajiu_token')
+      await fetch(`/api/v1/pending/${itemId}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reviewer_note: 'E2E 自动清理' }),
+      })
+    }, id)
+  }
+}
+
+async function apiTotal(path) {
+  return page.evaluate(async (url) => {
+    const token = localStorage.getItem('bajiu_token')
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    const payload = await response.json()
+    return payload?.data?.total ?? 0
+  }, path)
+}
+
+async function waitQuestionRows(expected) {
+  await page.waitForFunction(
+    (count) => {
+      if (document.querySelector('#main .card.empty')) return false
+      const rows = document.querySelectorAll('#main table tbody tr')
+      return rows.length === Math.min(count, 20)
+    },
+    expected,
+    { timeout: 10000 },
+  )
+}
+
 try {
   await page.goto(BASE, { waitUntil: 'networkidle' })
   await page.waitForSelector('#username', { timeout: 15000 })
@@ -62,6 +124,59 @@ try {
   await page.screenshot({ path: path.join(artifacts, '04-library-detail.png'), fullPage: true })
   await page.locator('.modal-close').click()
 
+  // 多维筛选：难度多选（维度内 OR）→ 行数与行内容 → 重置恢复
+  const difficultyCounts = {}
+  for (const value of ['1', '2', '3', '4', '5']) {
+    difficultyCounts[value] = await apiTotal(
+      `/api/v1/questions?status=active&difficulties=${value}&page=1&page_size=20`,
+    )
+  }
+  const activeDifficulties = Object.keys(difficultyCounts).filter(
+    (value) => difficultyCounts[value] > 0,
+  )
+  if (activeDifficulties.length < 2) throw new Error('题库缺少可用于多选筛选的难度数据')
+  const allTotal = await apiTotal('/api/v1/questions?status=active&page=1&page_size=20')
+  const difficultyLabels = { 1: '1 入门', 2: '2', 3: '3', 4: '4', 5: '5 困难' }
+  const [firstDifficulty, secondDifficulty] = activeDifficulties.slice(0, 2)
+  const firstLabel = difficultyLabels[firstDifficulty]
+  const secondLabel = difficultyLabels[secondDifficulty]
+  const multiExpectedTotal = await apiTotal(
+    `/api/v1/questions?status=active&difficulties=${firstDifficulty},${secondDifficulty}&page=1&page_size=20`,
+  )
+
+  const difficultyMulti = page.locator('.multi-select').first()
+  await difficultyMulti.locator('.multi-trigger').click()
+  const difficultyOption = (label) =>
+    difficultyMulti.locator('.multi-option').filter({ hasText: label }).first()
+  await difficultyOption(firstLabel).locator('input').check()
+  await waitQuestionRows(difficultyCounts[firstDifficulty])
+  const singleFilterTitles = await page
+    .locator('#main table tbody tr .difficulty-bars')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('title')))
+  if (singleFilterTitles.some((title) => title !== `难度 ${firstDifficulty}/5`)) {
+    throw new Error(`单选难度后出现不匹配行：${singleFilterTitles.join(', ')}`)
+  }
+  await difficultyOption(secondLabel).locator('input').check()
+  await waitQuestionRows(multiExpectedTotal)
+  const multiSummary = await difficultyMulti.locator('.multi-trigger').innerText()
+  if (!multiSummary.includes(firstLabel) || !multiSummary.includes(secondLabel)) {
+    throw new Error(`多选摘要未显示两个难度：${multiSummary}`)
+  }
+  const multiFilterTitles = await page
+    .locator('#main table tbody tr .difficulty-bars')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('title')))
+  const allowedTitles = [`难度 ${firstDifficulty}/5`, `难度 ${secondDifficulty}/5`]
+  if (multiFilterTitles.some((title) => !allowedTitles.includes(title))) {
+    throw new Error(`多选难度后出现不匹配行：${multiFilterTitles.join(', ')}`)
+  }
+  await page.getByRole('button', { name: '重置' }).click()
+  await waitQuestionRows(allTotal)
+  if (allTotal > 20) {
+    const paginationText = await page.locator('.pagination').innerText()
+    if (!paginationText.includes(`共 ${allTotal} 条`)) throw new Error('重置后未恢复全部题目')
+  }
+  await page.screenshot({ path: path.join(artifacts, '09-library-multiselect.png'), fullPage: true })
+
   await nav('知识库')
   await page.waitForSelector('table tbody tr', { timeout: 10000 })
   const knowledgeText = await page.locator('#main').innerText()
@@ -74,6 +189,12 @@ try {
   await page.waitForSelector('.source-card', { timeout: 10000 })
 
   await nav('采集待审')
+  await page.waitForTimeout(800)
+  let tempPendingIds = []
+  if (!(await page.locator('.pend-item').count())) {
+    tempPendingIds = await createTempPending()
+    await page.reload({ waitUntil: 'networkidle' })
+  }
   await page.waitForSelector('.pend-item', { timeout: 10000 })
   const pendingCount = await page.locator('.pend-item').count()
   if (pendingCount < 1) throw new Error('待审队列为空')
@@ -93,9 +214,53 @@ try {
   if (countAfterSelectAll !== pendingCount) throw new Error(`全选后数量应为 ${pendingCount}，实际 ${countAfterSelectAll}`)
   if (countAfterUnselect !== pendingCount - 1) throw new Error('取消一项后数量未减 1')
   await page.screenshot({ path: path.join(artifacts, '07-pending-bulk.png'), fullPage: true })
+  await rejectPending(tempPendingIds)
 
   await nav('统计复盘')
   await page.waitForSelector('.chart-svg', { timeout: 10000 })
+  await page.waitForSelector('.heatmap', { timeout: 10000 })
+
+  await nav('知识图谱')
+  await page.waitForSelector('.graph-node', { timeout: 10000 })
+  const graphNodeCount = await page.locator('.graph-node').count()
+  if (!graphNodeCount) throw new Error('知识图谱没有节点')
+  await page.locator('.graph-node').first().click()
+  await page.waitForSelector('.graph-side .tag.teal', { timeout: 5000 })
+  const nodeSideText = await page.locator('.graph-side').innerText()
+  if (!nodeSideText.includes('知识条目')) throw new Error('点击节点后侧栏未显示知识详情')
+  if (!nodeSideText.includes('以此为中心')) throw new Error('节点侧栏缺少聚焦按钮')
+  await page.screenshot({ path: path.join(artifacts, '08-graph-node.png'), fullPage: true })
+
+  await page.getByRole('button', { name: '以此为中心' }).click()
+  await page.waitForSelector('button:has-text("取消聚焦")', { timeout: 10000 })
+  await page.waitForTimeout(300)
+  await page.waitForFunction(
+    () =>
+      !document.querySelector('#main .card.empty') &&
+      document.querySelectorAll('#main .graph-node').length > 0,
+    { timeout: 10000 },
+  )
+  await page.getByRole('button', { name: '取消聚焦' }).click()
+  await page.waitForTimeout(300)
+  await page.waitForFunction(
+    () =>
+      !document.querySelector('#main .card.empty') &&
+      document.querySelectorAll('#main .graph-node').length > 0,
+    { timeout: 10000 },
+  )
+
+  await page.getByLabel('显示题目节点').check()
+  await page.waitForFunction(
+    () => {
+      const title = document.querySelector('#main .section-title')?.textContent || ''
+      const match = title.match(/\/\s*(\d+)\s*题/)
+      return match ? Number(match[1]) > 0 : false
+    },
+    { timeout: 10000 },
+  )
+  const graphText = await page.locator('#main').innerText()
+  if (!graphText.includes('知识图谱')) throw new Error('知识图谱页未渲染')
+  await page.screenshot({ path: path.join(artifacts, '08-graph.png'), fullPage: true })
 
   await nav('设置')
   await page.waitForTimeout(700)
@@ -127,6 +292,15 @@ try {
       countAfterSelect,
       countAfterSelectAll,
       countAfterUnselect,
+    },
+    filters: {
+      allTotal,
+      difficulties: [firstDifficulty, secondDifficulty],
+      firstCount: difficultyCounts[firstDifficulty],
+      multiCount: multiExpectedTotal,
+    },
+    graph: {
+      nodeCount: graphNodeCount,
     },
     problems,
   }, null, 2))

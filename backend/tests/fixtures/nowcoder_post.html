@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8"/>
+  <title>某公司后端面经（测试夹具）_牛客网</title>
+</head>
+<body>
+<div id="jsApp">
+  <div class="content-post-title"><h1>某公司后端面经（测试夹具）</h1></div>
+  <div class="nc-slate-editor-content">
+    <html>
+      <head></head>
+      <body>
+        <h2>一面</h2>
+        <p><strong>1.</strong> TCP 三次握手为什么需要三次？</p>
+        <ul>
+          <li>A. 两次也能建立连接</li>
+          <li>B. 确认双方收发能力并防止历史连接</li>
+        </ul>
+        <p><strong>答案：B（第三次 ACK 让双方都确认收发正常，并防止历史重复 SYN）</strong></p>
+        <p><strong>2.</strong> 进程和线程的区别是什么？</p>
+        <p><strong>答案：进程是资源分配单位，线程是 CPU 调度单位，线程共享进程资源。</strong></p>
+        <h2>Redis 缓存雪崩</h2>
+        <p>大量 key 同时过期会让请求直接打到数据库，常见做法是过期时间加随机值并做熔断降级。</p>
+      </body>
+    </html>
+  </div>
+</div>
+</body>
+</html>

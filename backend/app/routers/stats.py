@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -10,9 +10,11 @@ from ..errors import ok
 from ..models import User
 from ..security import get_current_user
 from ..services.review import (
+    category_mastery,
     dashboard_stats,
     knowledge_coverage,
     mastery_distribution,
+    review_heatmap,
     unfamiliar_distribution,
 )
 
@@ -52,3 +54,22 @@ def unfamiliar(
     _user: User = Depends(get_current_user),
 ):
     return ok(unfamiliar_distribution(db, category_id))
+
+
+@router.get("/review-heatmap")
+def heatmap(
+    days: int = Query(default=30, ge=7, le=180),
+    category_id: int | None = None,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    return ok(review_heatmap(db, days=days, category_id=category_id))
+
+
+@router.get("/category-mastery")
+def category_mastery_stats(
+    category_id: int | None = None,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    return ok(category_mastery(db, category_id))

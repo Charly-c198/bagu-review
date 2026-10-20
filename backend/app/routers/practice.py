@@ -23,6 +23,8 @@ from ..schemas import QuizRequest
 from ..security import get_current_user
 from ..services.batch_loader import serialize_question_list
 from ..services.categories import descendant_ids
+from ..services.filters import apply_multi_filters
+from ..services.fts import search_question_ids
 from ..utils.timeutil import today_str
 
 router = APIRouter(prefix="/practice", tags=["practice"])
@@ -87,11 +89,26 @@ def create_quiz(
         stmt = stmt.where(Question.frequency == payload.frequency)
     if payload.source_type:
         stmt = stmt.where(Question.source_type == payload.source_type)
+    stmt = apply_multi_filters(
+        stmt,
+        db,
+        category_ids=payload.category_ids,
+        tag_ids=payload.tag_ids,
+        company_ids=payload.company_ids,
+        difficulties=payload.difficulties,
+        frequencies=payload.frequencies,
+        sources=payload.sources,
+        masteries=payload.masteries,
+    )
     if payload.q:
-        pattern = f"%{payload.q}%"
-        stmt = stmt.where(
-            or_(Question.stem.like(pattern), Question.answer.like(pattern))
-        )
+        fts_ids = search_question_ids(db, payload.q)
+        if fts_ids is None:
+            pattern = f"%{payload.q}%"
+            stmt = stmt.where(
+                or_(Question.stem.like(pattern), Question.answer.like(pattern))
+            )
+        else:
+            stmt = stmt.where(Question.id.in_(fts_ids))
     if payload.mastery:
         if payload.mastery in ("unfamiliar", "不熟"):
             stmt = stmt.where(

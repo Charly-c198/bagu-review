@@ -12,6 +12,7 @@ from urllib.parse import quote, urlsplit
 
 import httpx
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from ..config import DATA_DIR, GITHUB_SSL_MODE
 from ..database import session_scope
@@ -21,6 +22,7 @@ from ..utils.timeutil import utcnow
 from .cleaning import clean_source_text
 from .import_parsers import parse_markdown
 from .ingest import ingest_parse_result
+from .nowcoder import NowcoderClient, parse_nowcoder_post, parse_nowcoder_source
 
 ALLOWED_HOSTS = {
     "github.com",
@@ -272,6 +274,109 @@ def _maybe_refresh_connection(client: GitHubClient) -> None:
         client.reset_fetch_connection()
 
 
+def _run_nowcoder(db: Session, task: CrawlTask, source: CrawlSource, log: list[str]) -> None:
+    """牛客公开帖采集：sitemap/帖子 URL → HTML → 解析 → 共用入库管线。"""
+    target = parse_nowcoder_source(source.url)
+    existing = db.scalars(
+        select(CrawlTaskFile)
+        .where(CrawlTaskFile.task_id == task.id)
+        .order_by(CrawlTaskFile.id)
+    ).all()
+    if existing:
+        file_rows = list(existing)
+        _log(log, f"重试任务：使用已有 {len(file_rows)} 个帖子记录")
+    else:
+        with NowcoderClient(
+            timeout=source.timeout_sec,
+            user_agent=source.user_agent,
+            spacing_sec=source.interval_sec,
+        ) as client:
+            client.check_robots(target)
+            urls = client.list_files(target, source.max_files_per_run)
+        _log(log, f"发现 {len(urls)} 个公开帖子")
+        file_rows = []
+        for url in urls:
+            row = CrawlTaskFile(task_id=task.id, url=url, status="pending")
+            db.add(row)
+            file_rows.append(row)
+        db.flush()
+        task.total_files = len(file_rows)
+        db.commit()
+
+    success = 0
+    failed = 0
+    with NowcoderClient(
+        timeout=source.timeout_sec,
+        user_agent=source.user_agent,
+        spacing_sec=source.interval_sec,
+    ) as client:
+        cache_dir = DATA_DIR / "crawl_cache" / str(task.id)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        for index, row in enumerate(file_rows):
+            if row.status == "success":
+                success += 1
+                continue
+            row.status = "running"
+            db.commit()
+            last_error = ""
+            for attempt in range(max(1, source.max_retries)):
+                try:
+                    status, title, text = client.fetch_post(row.url)
+                    row.http_status = status
+                    if status != 200:
+                        raise ValueError(f"HTTP {status}")
+                    text, cleaned = clean_source_text(text)
+                    if cleaned:
+                        _log(log, f"清洗 {row.url}：{len(cleaned)} 行广告/水印/纯符号")
+                    parsed = parse_nowcoder_post(text)
+                    outcome = ingest_parse_result(
+                        db,
+                        parsed,
+                        source_type="crawler",
+                        origin_prefix=row.url,
+                        crawl_task_id=task.id,
+                        source_id=source.id,
+                        origin_is_url=True,
+                    )
+                    parsed_count = len(parsed.questions) + len(parsed.knowledge)
+                    cache_path = cache_dir / f"{index:04d}.md"
+                    cache_path.write_text(text, encoding="utf-8")
+                    row.cached_path = str(cache_path)
+                    row.parsed_count = parsed_count
+                    row.status = "success"
+                    row.fetched_at = utcnow()
+                    row.error = None
+                    success += 1
+                    _log(
+                        log,
+                        f"成功 {row.url}（{title or '无标题'}），解析 {parsed_count} 条，"
+                        f"待审 {outcome.pending_created}，重复 {outcome.duplicates}",
+                    )
+                    last_error = ""
+                    break
+                except Exception as exc:  # noqa: BLE001
+                    last_error = f"{type(exc).__name__}: {exc}"
+                    if attempt + 1 < source.max_retries:
+                        time.sleep(2**attempt)
+            if last_error:
+                failed += 1
+                row.status = "failed"
+                row.error = last_error
+                _log(log, f"失败 {row.url}: {last_error}")
+            db.commit()
+            # 牛客是第三方站点，始终遵守源配置的间隔（至少 1 秒）。
+            time.sleep(max(MIN_INTERVAL, source.interval_sec))
+
+    task.success_files = success
+    task.failed_files = failed
+    if success == 0 and failed > 0:
+        task.status = "failed"
+    elif failed > 0:
+        task.status = "partial"
+    else:
+        task.status = "success"
+
+
 def run_task(task_id: int, token: str | None = None) -> None:
     """后台线程入口：执行一次采集任务。"""
     with session_scope() as db:
@@ -284,9 +389,9 @@ def run_task(task_id: int, token: str | None = None) -> None:
             task.log = "源不存在"
             task.finished_at = utcnow()
             return
-        if source.source_kind != "github":
+        if source.source_kind not in ("github", "nowcoder"):
             task.status = "failed"
-            task.log = "M1 仅支持 GitHub 采集，牛客爬虫将在 M2 提供"
+            task.log = "M2 仅支持 GitHub 与牛客公开页采集"
             task.finished_at = utcnow()
             return
 
@@ -297,6 +402,13 @@ def run_task(task_id: int, token: str | None = None) -> None:
         db.commit()
 
         try:
+            if source.source_kind == "nowcoder":
+                _run_nowcoder(db, task, source, log)
+                task.log = "\n".join(log)
+                task.finished_at = utcnow()
+                source.last_run_at = utcnow()
+                db.commit()
+                return
             target = parse_github_source(source.url)
             existing = db.scalars(
                 select(CrawlTaskFile)

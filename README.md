@@ -1,10 +1,10 @@
 # 八股文智能复习系统
 
-个人专属的面试八股文记忆 + 间隔重复（SM-2）+ 题库/知识库 Web 系统。按《八股文智能复习系统_项目文档_V0.4》的 **M1（P0）** 范围实现，本地优先、单用户、无 AI 也能完整使用。
+个人专属的面试八股文记忆 + 间隔重复（SM-2）+ 题库/知识库 Web 系统。按《八股文智能复习系统_项目文档_V0.4》的 **M1（P0）** 与 **M2 指定范围**（牛客爬虫、FTS5 全文搜索、统计可视化增强、多维筛选增强、知识图谱基础版）实现，本地优先、单用户、无 AI 也能完整使用。
 
 前端在原型 HTML 的基础上迁移为 Vue 3 + TypeScript + Vite + Pinia，保留原型的设计语言（青绿主题、侧边栏、卡片、刷题卡、SVG 趋势图），并补齐登录、知识库、收藏夹、采集任务、规则打标、备份恢复等页面。
 
-> 接手/继续开发：先阅读 [`HANDOFF.md`](HANDOFF.md)，其中包含当前状态、运行方式、关键约定、已知缺口与下一步建议。
+> 接手/继续开发：先阅读 [`M2_HANDOFF.md`](M2_HANDOFF.md)（M2 进度与坑）和 [`NEW_SESSION_HANDOFF.md`](NEW_SESSION_HANDOFF.md)（M1 背景与运行约定）。
 
 ---
 
@@ -36,6 +36,14 @@
 - 来源溯源：`question_origins` / `knowledge_origins`，支持按导入批次 / 爬虫源删除并归档无来源内容。
 - 组合 JSON 的题-知识关联在双方审核通过后自动建立。
 
+### M2 指定范围（已完成）
+
+- **牛客公开页爬虫**：支持公开帖子 `https://www.nowcoder.com/discuss/<id>` 与 sitemap（自动发现 `/discuss/<id>`，索引文件递归一层，单次最多 5 个子 sitemap）；域名白名单、仅 https、遵守 `robots.txt`（缓存 1 小时）；正文用 `HTMLParser` 转 Markdown（保留标题/列表/代码块），编号问答转题目候选；每篇间隔 ≥1 秒；与 GitHub 爬虫共用逐文件状态、重试、缓存、任务日志与待审管线。列表页是 SPA，明确拒绝并提示改用帖子或 sitemap。
+- **FTS5 全文搜索**：`questions` / `knowledge` 独立 FTS 表 + 触发器同步，`tokenize='trigram'` 支持中文子串；题库、知识库、组卷搜索已接入；<3 字查询自动回退 `LIKE`；启动时补齐历史索引，备份恢复后自动重建。
+- **统计可视化增强**：近 30 天复习热力图（每日自评次数与正确率，5 档颜色） + 各技术栈掌握度堆叠条，新端点 `/api/v1/stats/review-heatmap`、`/api/v1/stats/category-mastery`。
+- **多维筛选增强**：题库/组卷支持分类、标签、公司、难度、频率、来源、掌握度多选，**维度之间 AND、维度内部 OR**；前端 `MultiSelect` 复选面板；知识库支持分类/类型多选。
+- **知识图谱基础版**：`GET /api/v1/graph` 返回知识节点、知识-知识共现边（共享同一道题，权重=共现题数）与知识-题关系边；前端 `/graph` 同步力导向 SVG，支持点击详情、“以此为中心”一跳聚焦、显示题目节点、30/50/80/120 节点上限。
+
 ### 设置 / 数据
 - SM-2 参数、每日上限、提前复习、导入直接入库、手动新建进待审、去重阈值、爬虫单次文件数等可配置。
 - 导出 JSON / Markdown（可回环导入，含知识条目与关联）。
@@ -44,7 +52,7 @@
 - Docker Compose：nginx 静态前端 + FastAPI 单 worker + 命名卷 SQLite。
 
 ### 尚未实现（按文档后置）
-- M2：牛客爬虫、定时调度、FTS5、xlsx、PostgreSQL、知识图谱。
+- M2 其余项：定时调度、xlsx 导入导出、PostgreSQL（按用户要求本轮不做）。
 - M3a/M3b：大模型网关、AI 质量审查、自动打标、错题解析、仿真面试、周报告（D4 明确 AI 全部后置）。
 - M4：TTS/ASR、多人化、移动端。
 
@@ -61,21 +69,21 @@ bajiu-review/
 │  │  ├─ database.py             SQLAlchemy / SQLite PRAGMA
 │  │  ├─ models.py               25 张业务表（对应文档第 7 章）
 │  │  ├─ security.py             bcrypt / 会话 / 限流 / CSRF
-│  │  ├─ routers/                auth、题库、知识、导入、爬虫、待审、复习、统计…
-│  │  ├─ services/               SM-2、导入解析、去重、规则打标、爬虫、审核管线…
+│  │  ├─ routers/                auth、题库、知识、导入、爬虫、待审、复习、统计、图谱…
+│  │  ├─ services/               SM-2、导入解析、去重、规则打标、爬虫（GitHub/牛客）、FTS、多维筛选、审核管线…
 │  │  ├─ utils/                  归一化 / SimHash / 时区 / SM-2 纯函数
 │  │  └─ seed_demo.py            演示数据
 │  ├─ config/tag_rules.yaml      规则打标种子
 │  ├─ seed/demo_seed.json        35 题 + 22 条知识
-│  ├─ alembic/                   迁移
-│  ├─ tests/                     27 个单元/接口测试
+│  ├─ alembic/                   迁移（含 FTS5 建表/触发器迁移）
+│  ├─ tests/                     14 个测试文件 / 65 个用例
 │  ├─ requirements.txt
 │  ├─ run.py
 │  └─ Dockerfile
 ├─ frontend/
 │  ├─ src/
-│  │  ├─ views/                  14 个页面
-│  │  ├─ components/             侧边栏、TopBar、Modal、LineChart、BarRows…
+│  │  ├─ views/                  15 个页面（含知识图谱）
+│  │  ├─ components/             侧边栏、TopBar、Modal、LineChart、BarRows、MultiSelect…
 │  │  ├─ stores/app.ts           Pinia（登录、板块、徽标、Toast）
 │  │  ├─ api/                    fetch 封装 + 类型
 │  │  ├─ router/                 hash 路由 + 登录守卫
@@ -181,7 +189,7 @@ python -m app.seed_demo --reset  # 删除当前数据库并重建（会丢数据
 | `BAJIU_MAX_IMPORT_BYTES` | `5242880` | 导入硬上限（设置页可再调低） |
 | `BAJIU_MAX_IMPORT_ROWS` | `2000` | 导入行数硬上限 |
 | `GITHUB_TOKEN` | 空 | 可选，GitHub API 限流时使用 |
-| `BAJIU_GITHUB_SSL` | `certifi` | 采集 TLS 校验：`certifi` / `system`（系统根证书，本机走 TLS 代理时用）/ `none`（仅排障） |
+| `BAJIU_GITHUB_SSL` | `certifi` | 采集 TLS 校验（GitHub 与牛客共用）：`certifi` / `system`（系统根证书，本机走 TLS 代理时用）/ `none`（仅排障） |
 
 > `.env` 中的相对路径以启动进程的工作目录为基准。建议从 `backend/` 启动，或写绝对路径。
 
@@ -218,6 +226,13 @@ python -m app.seed_demo --reset  # 删除当前数据库并重建（会丢数据
 - 近似重复：SimHash 汉明距离 ≤ 阈值（默认 3）→ 待审项标记 `dup_of`，由人工决定合并。
 - 从题目要点（≥3 条）自动生成一条知识候选，仍进入待审区。
 
+### 5.5 M2 搜索 / 筛选 / 图谱口径
+
+- **FTS5**：`trigram` 分词，≥3 字查询走 FTS；<3 字（如“握手”）回退 `LIKE`；FTS 异常也自动回退，不抛 500。索引由触发器随增删改同步。
+- **多维筛选**：题库/知识库用逗号分隔查询参数，组卷用 JSON 数组；**维度之间 AND、维度内部 OR**，空值/空数组表示不过滤。
+- **牛客采集**：必须使用默认爬虫 UA（浏览器 UA 只能拿到 SPA 壳，正文为空）；仅公开帖/sitemap，遵守 `robots.txt`，不支持登录态与付费内容。
+- **知识图谱**：知识-知识边为共现边（共享同一道题的题数），知识-题边为 `related / prerequisite / derived_from`；`knowledge_id` 聚焦只返回一跳邻居；无关联数据时回退最近知识条目。
+
 ---
 
 ## 6. 测试
@@ -236,8 +251,9 @@ python -m pytest -q
 - **爬虫确定性验收**（`tests/test_crawl_acceptance.py`）：58 个 fixture 文件 → 92+ 候选题、≥30 知识、精确去重、失败重试、逐文件状态、批量审核与关联建立。
 - 规则打标独立覆盖率验收（`tests/test_tagging_coverage.py`，20 条未参与调规则的题干）。
 - Markdown XSS 纯文本存储、前端无 `v-html`、Alembic 空库迁移与表覆盖检查（`tests/test_ops.py`）。
+- **M2**：FTS5 中英文/短查询回退/增删改同步（`test_fts.py`）、多值筛选维度内 OR 与维度间 AND（`test_filters.py`）、统计热力图/分类掌握度与知识图谱节点边/聚焦（`test_m2_stats_graph.py`）、牛客 URL/robots/HTML 提取/编号问答/任务管线（`test_nowcoder.py` + HTML fixture）。
 
-当前结果：后端 `54 passed`（约 40s），前端 `npm run build` 与 E2E 均通过。
+当前结果：后端 `65 passed`（约 56s），`ruff check app tests` 通过，前端 `npm run build` 与 E2E 均通过。
 
 一键本地检查（与 CI 同口径：ruff + pytest + 前端构建，可选 `-WithE2E` / `--with-e2e`）：
 
@@ -258,7 +274,7 @@ cd frontend
 npm run e2e
 ```
 
-覆盖登录、仪表盘、刷题翻答案、今日复习、题库详情、知识库、导入、采集任务、待审、统计、设置、收藏/错题/冲刺，并断言无浏览器控制台错误。截图输出到 `frontend/e2e/artifacts/`。如 Edge 不在默认路径，设置 `EDGE_PATH` 环境变量。
+覆盖登录、仪表盘、刷题翻答案、今日复习、题库详情、难度多选筛选（行数与行内容、重置恢复）、知识库、导入、采集任务、待审批量选择、统计热力图、知识图谱（点击节点、以此为中心、显示题目节点）、设置、收藏/错题/冲刺，并断言无浏览器控制台错误。待审为空时自建临时知识候选并在结束时拒绝清理。截图输出到 `frontend/e2e/artifacts/`。如 Edge 不在默认路径，设置 `EDGE_PATH` 环境变量。
 
 数据库迁移：
 
@@ -328,7 +344,8 @@ sqlite3 backend/data/bajiu.db ".backup 'backend/data/backups/manual.db'"
 | 本地导入 | `/import`，MD/CSV/JSON + 粘贴 + 批次错误报告 |
 | 采集任务 | `/crawl`，源管理 + 任务 + 逐文件状态 + 重试 |
 | 采集待审 | `/pending`，题目/知识统一审核 |
-| 统计复盘 | `/stats`，掌握度/正确率/薄弱点/知识覆盖 |
+| 统计复盘 | `/stats`，掌握度/正确率/薄弱点/知识覆盖 + 30 天热力图 + 技术栈掌握度 |
+| 知识图谱 | `/graph`，共现力导向图 + 节点详情 + 一跳聚焦 |
 | 设置 | `/settings`，SM-2、导入、规则打标、板块、备份、账号 |
 | 原型没有的登录 | 已补口令登录 + 会话 + 限流 |
 | 原型没有的知识库/收藏/冲刺 | 按文档补齐 |
@@ -352,6 +369,7 @@ sqlite3 backend/data/bajiu.db ".backup 'backend/data/backups/manual.db'"
 
 **爬虫没有抓到文件**
 - 确认源 URL 是公开 GitHub 仓库 / tree / raw URL；GitHub API 限流时配置 `GITHUB_TOKEN`；任务详情里可看逐文件 HTTP 状态与错误。
+- 牛客源只支持 `/discuss/<id>` 与 `/sitemap*.xml`；列表页 `/discuss` 是 SPA，无法发现帖子链接。不要改成浏览器 UA（只能拿到 SPA 空壳）。
 
 **SQLite 锁**
 - 已启用 WAL、`busy_timeout=5000`、单 worker；避免多个后端进程同时写同一个数据库。
@@ -366,7 +384,7 @@ sqlite3 backend/data/bajiu.db ".backup 'backend/data/backups/manual.db'"
 - 默认仅监听 `127.0.0.1`；如需局域网访问，请自行加 HTTPS 反向代理。
 - 口令 bcrypt 哈希；会话 token 只存 SHA-256 哈希；登录限流。
 - CORS 白名单；cookie 模式写操作要求 `X-CSRF-Token`；前端默认使用 Bearer。
-- GitHub 源 URL 仅允许 `github.com` / `raw.githubusercontent.com` / `api.github.com`，拒绝私网/任意主机（SSRF 防护）。
-- 爬虫仅抓公开内容、限频、记录来源、不绕过登录/付费；个人学习不商用。
+- GitHub 源 URL 仅允许 `github.com` / `raw.githubusercontent.com` / `api.github.com`；牛客仅允许 `nowcoder.com` / `www.nowcoder.com` 且仅 https；均拒绝私网/任意主机（SSRF 防护）。
+- 爬虫仅抓公开内容、限频、遵守 `robots.txt`、记录来源、不绕过登录/付费；个人学习不商用。
 - Markdown/答案以纯文本渲染，不使用 `v-html`；导入文件限制大小/扩展名/MIME。
 - AI 功能未接入，不会把答题记录发送给任何 LLM。

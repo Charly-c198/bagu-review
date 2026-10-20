@@ -96,6 +96,12 @@ const router = createRouter({
       meta: { title: '统计复盘', crumb: '掌握度与趋势', section: '分析与设置' },
     },
     {
+      path: '/graph',
+      name: 'graph',
+      component: () => import('../views/GraphView.vue'),
+      meta: { title: '知识图谱', crumb: '题-知识关联网络', section: '分析与设置' },
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: () => import('../views/SettingsView.vue'),
