@@ -19,6 +19,7 @@ from .config import CORS_ORIGINS, FRONTEND_DIST
 from .database import SessionLocal, init_db
 from .errors import ApiError, ok
 from .routers import (
+    ai,
     auth,
     backup,
     bookmarks,
@@ -32,6 +33,7 @@ from .routers import (
     mistakes,
     pending,
     practice,
+    quality,
     questions,
     ratings,
     review,
@@ -168,6 +170,8 @@ for router in (
     stats.router,
     crawl.router,
     graph.router,
+    ai.router,
+    quality.router,
     settings_router.router,
     export.router,
     backup.router,

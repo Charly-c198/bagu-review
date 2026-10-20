@@ -5,6 +5,7 @@ import { api, withQuery } from '../api/client'
 import type { Knowledge } from '../api/types'
 import Modal from '../components/Modal.vue'
 import Pagination from '../components/Pagination.vue'
+import QualityPanel from '../components/QualityPanel.vue'
 import { useAppStore } from '../stores/app'
 import {
   formatDate,
@@ -356,6 +357,9 @@ watch(
           </div>
         </div>
         <div v-else class="list-sub">暂无来源记录</div>
+
+        <div class="section-title" style="font-size: 14px">AI 质量审查</div>
+        <QualityPanel target-type="knowledge" :target-id="detail.id" />
 
         <div class="form-actions" style="margin-top: 20px">
           <button class="btn ghost" @click="openEdit(detail)">编辑</button>

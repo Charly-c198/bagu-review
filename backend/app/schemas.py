@@ -207,3 +207,36 @@ class TagRuleUpdate(BaseModel):
     frequency: Frequency | None = None
     weight: float | None = None
     enabled: bool | None = None
+
+
+QualityIssueType = Literal[
+    "fact_error",
+    "outdated",
+    "ambiguous",
+    "incomplete",
+    "inconsistent",
+    "duplicate",
+    "other",
+]
+QualityRisk = Literal["low", "medium", "high"]
+
+
+class QualityIssueIn(BaseModel):
+    type: QualityIssueType = "other"
+    severity: QualityRisk = "low"
+    description: str = ""
+    evidence: str = ""
+    suggestion: str = ""
+    confidence: float | None = Field(default=None, ge=0, le=1)
+
+
+class QualityCheckRequest(BaseModel):
+    mode: Literal["ai", "manual"] = "ai"
+    issues: list[QualityIssueIn] | None = None
+    overall_risk: QualityRisk | None = None
+    summary: str | None = None
+
+
+class QualityTargetRequest(QualityCheckRequest):
+    target_type: Literal["question", "knowledge", "pending"]
+    target_id: int = Field(ge=1)

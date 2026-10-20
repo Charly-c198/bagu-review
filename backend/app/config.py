@@ -50,3 +50,18 @@ PORT = int(os.getenv("BAJIU_PORT", "8000"))
 #   certifi（默认，内置 CA）| system（操作系统根证书；本机走 TLS 代理时用这个）
 #   | none（不校验，仅排障用，存在中间人风险）
 GITHUB_SSL_MODE = os.getenv("BAJIU_GITHUB_SSL", "certifi").strip().lower()
+
+# M3a AI（OpenAI 兼容接口）。三项任一为空即视为未配置，AI 功能关闭，
+# 核心流程与人工质检不受影响。Key 只从环境变量读取，不落库、不回显。
+AI_BASE_URL = os.getenv("BAJIU_AI_BASE_URL", "").strip().rstrip("/")
+AI_API_KEY = os.getenv("BAJIU_AI_API_KEY", "").strip()
+AI_MODEL = os.getenv("BAJIU_AI_MODEL", "").strip()
+AI_TIMEOUT_SEC = int(os.getenv("BAJIU_AI_TIMEOUT_SEC", "60"))
+AI_MAX_INPUT_CHARS = int(os.getenv("BAJIU_AI_MAX_INPUT_CHARS", "8000"))
+AI_MAX_OUTPUT_TOKENS = int(os.getenv("BAJIU_AI_MAX_OUTPUT_TOKENS", "2000"))
+AI_MONTHLY_TOKEN_LIMIT = int(os.getenv("BAJIU_AI_MONTHLY_TOKEN_LIMIT", "1000000"))
+AI_CACHE_TTL_DAYS = int(os.getenv("BAJIU_AI_CACHE_TTL_DAYS", "30"))
+AI_PRICE_INPUT_PER_1K = float(os.getenv("BAJIU_AI_PRICE_INPUT_PER_1K", "0"))
+AI_PRICE_OUTPUT_PER_1K = float(os.getenv("BAJIU_AI_PRICE_OUTPUT_PER_1K", "0"))
+AI_JSON_MODE = os.getenv("BAJIU_AI_JSON_MODE", "auto").strip().lower()
+AI_SSL_MODE = os.getenv("BAJIU_AI_SSL", "certifi").strip().lower()

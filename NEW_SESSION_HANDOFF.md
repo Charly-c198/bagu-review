@@ -1,6 +1,7 @@
 # 八股文智能复习系统 · 新会话开场文档
 
 > M2（牛客爬虫 / FTS5 / 统计增强 / 多维筛选 / 知识图谱基础版）的进度、接口与待办见 **`M2_HANDOFF.md`**（2026-10-20）。
+> M3a Slice 1（AI 网关 / 质量审查 / 人工质检双通道）见 **`M3_HANDOFF.md`**（2026-10-20）。
 
 > 写给：同项目上一位会话的接替者（下一位开发者或 AI）。
 > 最后核实：**2026-10-20（第二轮）**。本文所有断言都在当天对代码 / 数据库 / 测试实测过；没核实的事情会明确写“未核实”。
@@ -22,8 +23,9 @@
 | E | CI | ✅ `git init` + 首次提交；`.github/workflows/ci.yml`、`scripts/check.ps1` / `check.sh`、`backend/ruff.toml`、`requirements-dev.txt` |
 | F | Markdown XSS、Alembic 自动化等补测 | ✅ XSS 纯文本存储 + 前端无 `v-html` + Alembic 空库迁移；导出回环含关联确认已有测试覆盖 |
 | G | M2 指定范围 | ✅ 牛客爬虫 + FTS5 + 统计可视化 + 多维筛选 + 知识图谱基础版，详见 `M2_HANDOFF.md` |
+| H | M3a Slice 1 | ✅ AI 网关 + 质量审查 + 人工质检兜底，详见 `M3_HANDOFF.md` |
 
-**若用户说“继续做项目”**：可开始 Docker（D）、内容扩充（重跑爬虫/导入），或按 `M2_HANDOFF.md` §4 的可选增强继续（手工知识关系表、更多统计维度等）。
+**若用户说“继续做项目”**：可按 `M3_HANDOFF.md` §8 继续 Slice 2（自动打标）/ Slice 3（错题解析、答案润色）/ M3b；Docker（D）仍按用户要求暂缓。
 
 ---
 
@@ -63,7 +65,7 @@ cd ..\frontend; npm run build; npm run e2e
 cd ..; .\scripts\check.ps1            # 或 .\scripts\check.ps1 -WithE2E
 ```
 
-基线（2026-10-20 M2 收尾实测）：**后端 65 passed（约 56s）**，`ruff check app tests` 通过，`vue-tsc + vite build` 通过，E2E `problems: []`（含多选筛选与图谱交互断言）。M2 细节见 `M2_HANDOFF.md`。
+基线（2026-10-20 M3a Slice 1 实测）：**后端 76 passed（约 65s）**，`ruff check app tests` 通过，`vue-tsc + vite build` 通过，E2E `problems: []`（含多选筛选、图谱交互、人工质检与 AI 状态断言）。M2/M3 细节见对应 HANDOFF。
 
 默认账号 `admin / admin123`。
 
@@ -181,11 +183,12 @@ M2 新增 / 修改的文件地图见 `M2_HANDOFF.md` §6（`nowcoder.py`、`fts.
 
 ```text
 项目在 D:\Program Files\JetBrains\PythonProject\bajiu-review。
-请先读 M2_HANDOFF.md（M2 最新状态、运行方式、坑与可选增强），M1 背景与验收口径见 NEW_SESSION_HANDOFF.md。
-当前：M1 + M2 指定范围（牛客爬虫 / FTS5 / 统计增强 / 多维筛选 / 知识图谱基础版）已完成；
-后端 65 passed、ruff 通过、前端 build/E2E 通过；只剩 Docker 按用户要求暂缓。
+请先读 M3_HANDOFF.md（当前 M3a Slice 1 状态、AI 配置与坑），M2/M1 见 M2_HANDOFF.md / NEW_SESSION_HANDOFF.md。
+当前：M1 + M2 指定范围 + M3a Slice 1（AI 网关 / 质量审查 / 人工质检双通道）已完成；
+后端 76 passed、ruff 通过、前端 build/E2E 通过；Docker 仍按用户要求暂缓。
 真实爬虫演示：doocs/advanced-java（92/92 文件，465 条解析）；演示库 123 题 / 67 知识 / 46 关联 / 待审 0。
-下一步我想做的是：<例如：开始 Docker 实跑 / 内容扩充 / 知识关系表与图谱增强 / 性能压测>。
+下一步我想做的是：<例如：Slice 2 自动打标 / Slice 3 错题解析与答案润色 / M3b / Docker 实跑>。
 注意：后端 127.0.0.1:8000，admin/admin123；本机爬虫要设 BAJIU_GITHUB_SSL=system；
-牛客必须用爬虫 UA（浏览器 UA 只能拿到 SPA 壳）；FTS 短查询会回退 LIKE；改后端后先结束旧 uvicorn；npm 安装用官方 registry。
+牛客必须用爬虫 UA（浏览器 UA 只能拿到 SPA 壳）；FTS 短查询会回退 LIKE；AI 配置只走环境变量，
+未配置时人工质检必须保持可用；改后端后先结束旧 uvicorn；npm 安装用官方 registry。
 ```

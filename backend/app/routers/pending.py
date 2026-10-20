@@ -21,6 +21,12 @@ from ..models import (
 )
 from ..schemas import ApproveRequest, MergeRequest, PendingUpdate, RejectRequest
 from ..security import get_current_user
+from ..services.ai.quality import (
+    latest_checks,
+    quality_summaries,
+    quality_summary,
+    serialize_quality_check,
+)
 from ..services.audit import audit
 from ..services.categories import (
     category_map,
@@ -239,9 +245,15 @@ def list_pending(
         ),
     }
     counts["total"] = counts["question"] + counts["knowledge"]
+    quality = quality_summaries(db, "pending", [row.id for row in rows])
+    items = []
+    for row in rows:
+        data = serialize_pending(db, row)
+        data["quality"] = quality[row.id]
+        items.append(data)
     return ok(
         {
-            "items": [serialize_pending(db, row) for row in rows],
+            "items": items,
             "total": total,
             "page": page,
             "page_size": page_size,
@@ -259,6 +271,11 @@ def get_pending(
     item = _get_pending(db, item_id)
     data = serialize_pending(db, item)
     data["similar"] = _similar_items(db, item)
+    data["quality"] = quality_summary(db, "pending", item_id)
+    data["quality_checks"] = [
+        serialize_quality_check(row)
+        for row in latest_checks(db, "pending", item_id)
+    ]
     if item.item_type == "question":
         data["suggested_knowledge"] = _suggested_knowledge(db, item)
     return ok(data)

@@ -214,6 +214,30 @@ try {
   if (countAfterSelectAll !== pendingCount) throw new Error(`全选后数量应为 ${pendingCount}，实际 ${countAfterSelectAll}`)
   if (countAfterUnselect !== pendingCount - 1) throw new Error('取消一项后数量未减 1')
   await page.screenshot({ path: path.join(artifacts, '07-pending-bulk.png'), fullPage: true })
+
+  // 人工质检通道：AI 未配置时也必须完整可用
+  await page.locator('.pend-item').first().getByRole('button', { name: '详情' }).click()
+  await page.waitForSelector('.modal-card .quality-panel', { timeout: 10000 })
+  await page.locator('.quality-panel').getByRole('button', { name: '人工质检' }).click()
+  await page.waitForSelector('.quality-manual-form', { timeout: 10000 })
+  await page
+    .locator('.quality-manual-form textarea')
+    .first()
+    .fill('E2E 人工质检：内容完整，未发现事实错误。')
+  await page.locator('.quality-manual-form select').nth(1).selectOption('high')
+  await page.getByRole('button', { name: '保存人工质检' }).click()
+  await page.waitForSelector('.quality-panel .quality-issue', { timeout: 10000 })
+  const qualityText = await page.locator('.quality-panel').innerText()
+  if (!qualityText.includes('人工') || !qualityText.includes('高风险')) {
+    throw new Error(`人工质检结果未正确展示：${qualityText}`)
+  }
+  await page.screenshot({ path: path.join(artifacts, '10-quality-manual.png'), fullPage: true })
+  await page.locator('.modal-card .modal-close').last().click()
+  await page.waitForTimeout(500)
+  if (!(await page.locator('.pend-item', { hasText: '质检' }).count())) {
+    throw new Error('待审列表未显示质检徽标')
+  }
+
   await rejectPending(tempPendingIds)
 
   await nav('统计复盘')
@@ -266,6 +290,8 @@ try {
   await page.waitForTimeout(700)
   const settingsText = await page.locator('#main').innerText()
   if (!settingsText.includes('SM-2 间隔重复参数')) throw new Error('设置页未渲染')
+  if (!settingsText.includes('AI 能力（M3a）')) throw new Error('设置页缺少 AI 状态')
+  if (!settingsText.includes('BAJIU_AI_BASE_URL')) throw new Error('设置页缺少 AI 配置说明')
   await page.screenshot({ path: path.join(artifacts, '05-settings.png'), fullPage: true })
 
   await nav('收藏夹')

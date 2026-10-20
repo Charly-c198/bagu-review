@@ -5,6 +5,7 @@ import { api, withQuery } from '../api/client'
 import type { PendingItem } from '../api/types'
 import Modal from '../components/Modal.vue'
 import Pagination from '../components/Pagination.vue'
+import QualityPanel from '../components/QualityPanel.vue'
 import { useAppStore } from '../stores/app'
 import {
   formatDateTime,
@@ -143,6 +144,19 @@ function confidenceTone(item: PendingItem): string {
   if (value < 0.6) return 'orange'
   if (value < 0.85) return 'amber'
   return 'green'
+}
+
+function qualityTone(risk: string | null | undefined): string {
+  if (risk === 'high') return 'orange'
+  if (risk === 'medium') return 'amber'
+  return 'green'
+}
+
+function qualityText(risk: string | null | undefined): string {
+  if (risk === 'high') return '高风险'
+  if (risk === 'medium') return '中风险'
+  if (risk === 'low') return '低风险'
+  return '已质检'
 }
 
 function dupText(item: PendingItem): string {
@@ -478,6 +492,10 @@ onMounted(load)
           <span class="tag teal">{{ item.source_type === 'crawler' ? '爬虫' : item.source_type === 'import' ? '导入' : item.source_type === 'manual' ? '手动' : 'AI' }}</span>
           <span class="tag blue">{{ item.item_type === 'question' ? '题目' : '知识' }}</span>
           <span class="tag" :class="confidenceTone(item)">置信度 {{ confidence(item) }}%</span>
+          <span v-if="item.quality?.status === 'needs_manual'" class="tag orange">待人工质检</span>
+          <span v-else-if="item.quality?.status === 'checked'" class="tag" :class="qualityTone(item.quality.risk)">
+            质检 {{ qualityText(item.quality.risk) }}
+          </span>
           <span v-if="dupText(item)" class="tag orange">{{ dupText(item) }}</span>
           <span v-if="item.status !== 'pending'" class="tag gray">{{ item.status }}</span>
         </div>
@@ -525,6 +543,9 @@ onMounted(load)
           <span v-if="metaOf(detail).frequency" class="tag amber">{{ frequencyText(metaOf(detail).frequency) }}</span>
           <span class="tag gray">规则命中 {{ (metaOf(detail).matched_rules || []).length }}</span>
         </div>
+
+        <div class="section-title" style="font-size: 14px">质量审查</div>
+        <QualityPanel target-type="pending" :target-id="detail.id" @checked="load" />
 
         <div class="section-title" style="font-size: 14px">相似内容</div>
         <div v-if="detail.similar?.length">

@@ -130,6 +130,8 @@ export interface PendingItem {
     category_path: string
     relation_type: string
   }[]
+  quality?: QualitySummary
+  quality_checks?: QualityCheck[]
   [key: string]: unknown
 }
 
@@ -320,4 +322,69 @@ export interface KnowledgeGraph {
   edges: GraphEdge[]
   stats: { knowledge: number; questions: number; edges: number }
   definitions_version: string
+}
+
+export type QualityRisk = 'low' | 'medium' | 'high'
+
+export interface QualityIssue {
+  type:
+    | 'fact_error'
+    | 'outdated'
+    | 'ambiguous'
+    | 'incomplete'
+    | 'inconsistent'
+    | 'duplicate'
+    | 'other'
+  severity: QualityRisk
+  description: string
+  evidence: string
+  suggestion: string
+  confidence: number | null
+}
+
+export interface QualityCheck {
+  id: number
+  target_type: 'question' | 'knowledge' | 'pending'
+  target_id: number
+  status: 'success' | 'failed'
+  issues: QualityIssue[]
+  overall_risk: QualityRisk | null
+  summary: string | null
+  model: string
+  prompt_version_id: number | null
+  error_code: string | null
+  created_at: string
+  reviewed_at: string | null
+}
+
+export interface QualitySummary {
+  status: 'checked' | 'needs_manual' | 'unchecked'
+  risk: QualityRisk | null
+  source: 'ai' | 'manual' | null
+  model: string | null
+  checked_at: string | null
+  error_code: string | null
+  summary: string | null
+}
+
+export interface AIStatus {
+  configured: boolean
+  model: string | null
+  base_url: string | null
+  timeout_sec: number
+  max_input_chars: number
+  max_output_tokens: number
+  monthly_token_limit: number
+  cache_ttl_days: number
+  json_mode: string
+  usage: {
+    calls: number
+    cache_hits: number
+    input_tokens: number
+    output_tokens: number
+    tokens: number
+    cost: number
+  }
+  prompt_versions: { name: string; version: string }[]
+  env: string[]
 }

@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { api } from '../api/client'
-import type { Settings, TagRule } from '../api/types'
+import type { AIStatus, Settings, TagRule } from '../api/types'
 import Modal from '../components/Modal.vue'
 import { useAppStore } from '../stores/app'
 import {
@@ -22,6 +22,7 @@ const rules = ref<TagRule[]>([])
 const tags = ref<{ id: number; name: string }[]>([])
 const backups = ref<{ name: string; size: number; modified_at: string }[]>([])
 const rulesLoading = ref(true)
+const aiStatus = ref<AIStatus | null>(null)
 
 const ruleOpen = ref(false)
 const ruleSaving = ref(false)
@@ -99,6 +100,14 @@ async function loadBackups(): Promise<void> {
     backups.value = await api.get('/backup/list')
   } catch {
     backups.value = []
+  }
+}
+
+async function loadAIStatus(): Promise<void> {
+  try {
+    aiStatus.value = await api.get<AIStatus>('/ai/status')
+  } catch {
+    aiStatus.value = null
   }
 }
 
@@ -240,7 +249,7 @@ async function logout(): Promise<void> {
 }
 
 onMounted(async () => {
-  await Promise.all([loadSettings(), loadRules(), loadBackups()])
+  await Promise.all([loadSettings(), loadRules(), loadBackups(), loadAIStatus()])
 })
 </script>
 
@@ -310,6 +319,53 @@ onMounted(async () => {
 
       <div class="form-actions" style="margin-top: 14px">
         <button class="btn" :disabled="saving" @click="saveSettings">{{ saving ? '保存中…' : '保存设置' }}</button>
+      </div>
+
+      <div class="section-title" style="justify-content: space-between">
+        <span>AI 能力（M3a）</span>
+        <button class="btn ghost sm" @click="loadAIStatus">刷新状态</button>
+      </div>
+      <div class="card">
+        <div class="setting-row">
+          <div>
+            <b>AI 状态</b>
+            <div class="list-sub">OpenAI 兼容接口；未配置时 AI 按钮会提示未配置，人工质检始终可用</div>
+          </div>
+          <span class="tag" :class="aiStatus?.configured ? 'green' : 'gray'">
+            {{ aiStatus?.configured ? '已配置' : '未配置' }}
+          </span>
+        </div>
+        <template v-if="aiStatus">
+          <div class="setting-row">
+            <div>
+              <b>模型 / 地址</b>
+              <div class="list-sub mono">{{ aiStatus.model || '—' }}</div>
+            </div>
+            <span class="list-sub mono">{{ aiStatus.base_url || '—' }}</span>
+          </div>
+          <div class="setting-row">
+            <div>
+              <b>本月用量</b>
+              <div class="list-sub">
+                {{ aiStatus.usage.tokens.toLocaleString() }} tokens · {{ aiStatus.usage.calls }} 次调用 ·
+                缓存命中 {{ aiStatus.usage.cache_hits }}
+              </div>
+            </div>
+            <span class="tag gray">预算 {{ aiStatus.monthly_token_limit.toLocaleString() }} tokens</span>
+          </div>
+          <div v-if="aiStatus.prompt_versions.length" class="setting-row">
+            <div>
+              <b>Prompt 版本</b>
+              <div class="list-sub">
+                {{ aiStatus.prompt_versions.map((item) => `${item.name} ${item.version}`).join('、') }}
+              </div>
+            </div>
+          </div>
+        </template>
+        <div class="list-sub" style="margin-top: 8px">
+          配置方式：在 .env 或环境变量中设置 BAJIU_AI_BASE_URL / BAJIU_AI_API_KEY / BAJIU_AI_MODEL。
+          Key 只从环境读取，不会显示在此页面。AI 失败时可在待审详情转人工质检。
+        </div>
       </div>
 
       <div class="section-title">板块管理（岗位方向）</div>

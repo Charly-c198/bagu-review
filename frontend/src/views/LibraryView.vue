@@ -7,6 +7,7 @@ import DifficultyBars from '../components/DifficultyBars.vue'
 import Modal from '../components/Modal.vue'
 import MultiSelect from '../components/MultiSelect.vue'
 import Pagination from '../components/Pagination.vue'
+import QualityPanel from '../components/QualityPanel.vue'
 import { useAppStore } from '../stores/app'
 import {
   formatDate,
@@ -520,6 +521,9 @@ watch(
             <br /><br /><b>个人笔记：</b>{{ detail.notes }}
           </template>
         </div>
+
+        <div class="section-title" style="font-size: 14px">AI 质量审查</div>
+        <QualityPanel target-type="question" :target-id="detail.id" />
 
         <div class="section-title" style="font-size: 14px">复习排程</div>
         <div class="list-sub">

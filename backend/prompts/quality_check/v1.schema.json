@@ -1,0 +1,60 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["target_type", "target_id", "issues", "overall_risk", "summary"],
+  "properties": {
+    "target_type": {
+      "type": "string",
+      "enum": ["question", "knowledge", "pending"]
+    },
+    "target_id": {
+      "type": "integer"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "severity",
+          "description",
+          "evidence",
+          "suggestion",
+          "confidence"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "fact_error",
+              "outdated",
+              "ambiguous",
+              "incomplete",
+              "inconsistent",
+              "duplicate",
+              "other"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "description": {"type": "string"},
+          "evidence": {"type": "string"},
+          "suggestion": {"type": "string"},
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "overall_risk": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "summary": {"type": "string"}
+  }
+}

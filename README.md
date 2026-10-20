@@ -1,10 +1,10 @@
 # 八股文智能复习系统
 
-个人专属的面试八股文记忆 + 间隔重复（SM-2）+ 题库/知识库 Web 系统。按《八股文智能复习系统_项目文档_V0.4》的 **M1（P0）** 与 **M2 指定范围**（牛客爬虫、FTS5 全文搜索、统计可视化增强、多维筛选增强、知识图谱基础版）实现，本地优先、单用户、无 AI 也能完整使用。
+个人专属的面试八股文记忆 + 间隔重复（SM-2）+ 题库/知识库 Web 系统。按《八股文智能复习系统_项目文档_V0.4》的 **M1（P0）**、**M2 指定范围**（牛客爬虫、FTS5 全文搜索、统计可视化增强、多维筛选增强、知识图谱基础版）与 **M3a Slice 1**（AI 网关 + 题目/知识质量审查 + 人工质检兜底）实现，本地优先、单用户、无 AI 也能完整使用。
 
 前端在原型 HTML 的基础上迁移为 Vue 3 + TypeScript + Vite + Pinia，保留原型的设计语言（青绿主题、侧边栏、卡片、刷题卡、SVG 趋势图），并补齐登录、知识库、收藏夹、采集任务、规则打标、备份恢复等页面。
 
-> 接手/继续开发：先阅读 [`M2_HANDOFF.md`](M2_HANDOFF.md)（M2 进度与坑）和 [`NEW_SESSION_HANDOFF.md`](NEW_SESSION_HANDOFF.md)（M1 背景与运行约定）。
+> 接手/继续开发：先阅读 [`M3_HANDOFF.md`](M3_HANDOFF.md)（当前 M3a Slice 1 状态与 AI 配置）、[`M2_HANDOFF.md`](M2_HANDOFF.md)（M2 进度与坑）和 [`NEW_SESSION_HANDOFF.md`](NEW_SESSION_HANDOFF.md)（M1 背景与运行约定）。
 
 ---
 
@@ -44,6 +44,15 @@
 - **多维筛选增强**：题库/组卷支持分类、标签、公司、难度、频率、来源、掌握度多选，**维度之间 AND、维度内部 OR**；前端 `MultiSelect` 复选面板；知识库支持分类/类型多选。
 - **知识图谱基础版**：`GET /api/v1/graph` 返回知识节点、知识-知识共现边（共享同一道题，权重=共现题数）与知识-题关系边；前端 `/graph` 同步力导向 SVG，支持点击详情、“以此为中心”一跳聚焦、显示题目节点、30/50/80/120 节点上限。
 
+### M3a Slice 1（AI 质检 + 人工质检）
+
+- **AI 网关**：OpenAI 兼容 `POST /chat/completions`，通过环境变量配置 base_url / key / model；支持超时重试、JSON 模式自动降级、JSON Schema 校验与一次修复重试。
+- **质量审查**：待审项、题目、知识条目均可手动发起 AI 质检；输出问题类型、严重度、证据、修改建议、置信度与整体风险，写入 `quality_checks`，**只做建议**，不改变审核状态或正文。
+- **人工质检兜底**：AI 未配置、超时、限流、预算用完或返回格式不合法时，落一条 `status=failed` 记录；前端显示“待人工质检”，可填写同结构表单，或稍后重试 AI。人工通道始终可用，不依赖 Key。
+- **成本与缓存**：`ai_calls` 记录 token、耗时与状态；`ai_cache` 按内容哈希缓存；月 token 预算硬上限，超限后提示转人工。
+- **隐私**：AI 输入不包含题目个人笔记与用户答题原文；Key 只从环境变量读取，不落库、不回显。
+- **状态入口**：设置页展示 AI 配置、模型、本月用量与缓存命中；接口 `GET /api/v1/ai/status`。
+
 ### 设置 / 数据
 - SM-2 参数、每日上限、提前复习、导入直接入库、手动新建进待审、去重阈值、爬虫单次文件数等可配置。
 - 导出 JSON / Markdown（可回环导入，含知识条目与关联）。
@@ -52,8 +61,9 @@
 - Docker Compose：nginx 静态前端 + FastAPI 单 worker + 命名卷 SQLite。
 
 ### 尚未实现（按文档后置）
+- M3a 其余：自动打标、错题解析、答案润色（网关与质量审查已在 Slice 1 落地）。
+- M3b：题目生产、文字仿真面试、周报告（依赖会话/报告表，单独排期）。
 - M2 其余项：定时调度、xlsx 导入导出、PostgreSQL（按用户要求本轮不做）。
-- M3a/M3b：大模型网关、AI 质量审查、自动打标、错题解析、仿真面试、周报告（D4 明确 AI 全部后置）。
 - M4：TTS/ASR、多人化、移动端。
 
 ---
@@ -76,14 +86,14 @@ bajiu-review/
 │  ├─ config/tag_rules.yaml      规则打标种子
 │  ├─ seed/demo_seed.json        35 题 + 22 条知识
 │  ├─ alembic/                   迁移（含 FTS5 建表/触发器迁移）
-│  ├─ tests/                     14 个测试文件 / 65 个用例
+│  ├─ tests/                     15 个测试文件 / 76 个用例
 │  ├─ requirements.txt
 │  ├─ run.py
 │  └─ Dockerfile
 ├─ frontend/
 │  ├─ src/
 │  │  ├─ views/                  15 个页面（含知识图谱）
-│  │  ├─ components/             侧边栏、TopBar、Modal、LineChart、BarRows、MultiSelect…
+│  │  ├─ components/             侧边栏、TopBar、Modal、LineChart、BarRows、MultiSelect、QualityPanel…
 │  │  ├─ stores/app.ts           Pinia（登录、板块、徽标、Toast）
 │  │  ├─ api/                    fetch 封装 + 类型
 │  │  ├─ router/                 hash 路由 + 登录守卫
@@ -190,6 +200,18 @@ python -m app.seed_demo --reset  # 删除当前数据库并重建（会丢数据
 | `BAJIU_MAX_IMPORT_ROWS` | `2000` | 导入行数硬上限 |
 | `GITHUB_TOKEN` | 空 | 可选，GitHub API 限流时使用 |
 | `BAJIU_GITHUB_SSL` | `certifi` | 采集 TLS 校验（GitHub 与牛客共用）：`certifi` / `system`（系统根证书，本机走 TLS 代理时用）/ `none`（仅排障） |
+| `BAJIU_AI_BASE_URL` | 空 | M3a：OpenAI 兼容接口地址（如 `https://api.deepseek.com/v1`）；与 Key、模型任一为空即关闭 AI |
+| `BAJIU_AI_API_KEY` | 空 | M3a：AI API Key；只从环境变量读取，不落库、不回显 |
+| `BAJIU_AI_MODEL` | 空 | M3a：模型名，例如供应商文档中的 chat/completions 模型 ID |
+| `BAJIU_AI_TIMEOUT_SEC` | `60` | AI 请求超时（秒） |
+| `BAJIU_AI_MAX_INPUT_CHARS` | `8000` | 单次送入 AI 的最大正文字符数，超出会截断 |
+| `BAJIU_AI_MAX_OUTPUT_TOKENS` | `2000` | 单次输出 token 上限 |
+| `BAJIU_AI_MONTHLY_TOKEN_LIMIT` | `1000000` | 每月 token 预算硬上限；`0` 表示不限制 |
+| `BAJIU_AI_CACHE_TTL_DAYS` | `30` | AI 结果缓存天数 |
+| `BAJIU_AI_JSON_MODE` | `auto` | `auto`（不支持时自动去掉 response_format）/ `on` / `off` |
+| `BAJIU_AI_SSL` | `certifi` | AI 请求 TLS 校验：`certifi` / `system` / `none` |
+| `BAJIU_AI_PRICE_INPUT_PER_1K` | `0` | 可选费用估算：每 1K 输入 token 单价 |
+| `BAJIU_AI_PRICE_OUTPUT_PER_1K` | `0` | 可选费用估算：每 1K 输出 token 单价 |
 
 > `.env` 中的相对路径以启动进程的工作目录为基准。建议从 `backend/` 启动，或写绝对路径。
 
@@ -233,6 +255,16 @@ python -m app.seed_demo --reset  # 删除当前数据库并重建（会丢数据
 - **牛客采集**：必须使用默认爬虫 UA（浏览器 UA 只能拿到 SPA 壳，正文为空）；仅公开帖/sitemap，遵守 `robots.txt`，不支持登录态与付费内容。
 - **知识图谱**：知识-知识边为共现边（共享同一道题的题数），知识-题边为 `related / prerequisite / derived_from`；`knowledge_id` 聚焦只返回一跳邻居；无关联数据时回退最近知识条目。
 
+### 5.6 M3a AI 质检口径
+
+- AI 质检只写 `quality_checks`，**不改变待审状态、不修改正式内容**；通过/拒绝仍由人工操作。
+- 最新一条记录决定徽标：最新 `success` → 已质检；最新 `failed` → 待人工质检；没有记录 → 未质检。
+- 人工质检与 AI 共用 `issues` 结构；人工记录 `model='manual'`、`prompt_version_id` 为空，可随时使用。
+- AI 失败记录会保留，可对 failed 记录重试；重试成功新增一条记录，不覆盖历史。
+- AI 输入只含题干/答案/要点或知识标题/内容/别名，**不含个人笔记与用户答题原文**。
+- 预算按当月 `ai_calls` 的 success/failed token 合计计算；达到上限后拒绝新调用，缓存命中不消耗 token。
+- 相关接口：`POST /pending/{id}/quality-check`、`POST /quality/check`、`GET /quality-checks`、`POST /quality-checks/{id}/retry`、`GET /ai/status`。
+
 ---
 
 ## 6. 测试
@@ -252,8 +284,9 @@ python -m pytest -q
 - 规则打标独立覆盖率验收（`tests/test_tagging_coverage.py`，20 条未参与调规则的题干）。
 - Markdown XSS 纯文本存储、前端无 `v-html`、Alembic 空库迁移与表覆盖检查（`tests/test_ops.py`）。
 - **M2**：FTS5 中英文/短查询回退/增删改同步（`test_fts.py`）、多值筛选维度内 OR 与维度间 AND（`test_filters.py`）、统计热力图/分类掌握度与知识图谱节点边/聚焦（`test_m2_stats_graph.py`）、牛客 URL/robots/HTML 提取/编号问答/任务管线（`test_nowcoder.py` + HTML fixture）。
+- **M3a Slice 1**：AI 质检成功、AI 失败转人工、人工质检、重试、未配置降级、隐私输入裁剪、AI 状态不泄露 Key（`test_ai_quality.py`）；网关缓存、429/5xx 重试、Schema 修复、月预算（MockTransport，不访问真实网络）。
 
-当前结果：后端 `65 passed`（约 56s），`ruff check app tests` 通过，前端 `npm run build` 与 E2E 均通过。
+当前结果：后端 `76 passed`（约 65s），`ruff check app tests` 通过，前端 `npm run build` 与 E2E 均通过。
 
 一键本地检查（与 CI 同口径：ruff + pytest + 前端构建，可选 `-WithE2E` / `--with-e2e`）：
 
@@ -274,7 +307,7 @@ cd frontend
 npm run e2e
 ```
 
-覆盖登录、仪表盘、刷题翻答案、今日复习、题库详情、难度多选筛选（行数与行内容、重置恢复）、知识库、导入、采集任务、待审批量选择、统计热力图、知识图谱（点击节点、以此为中心、显示题目节点）、设置、收藏/错题/冲刺，并断言无浏览器控制台错误。待审为空时自建临时知识候选并在结束时拒绝清理。截图输出到 `frontend/e2e/artifacts/`。如 Edge 不在默认路径，设置 `EDGE_PATH` 环境变量。
+覆盖登录、仪表盘、刷题翻答案、今日复习、题库详情、难度多选筛选（行数与行内容、重置恢复）、知识库、导入、采集任务、待审批量选择与人工质检（保存后列表徽标）、统计热力图、知识图谱（点击节点、以此为中心、显示题目节点）、设置页 AI 状态、收藏/错题/冲刺，并断言无浏览器控制台错误。待审为空时自建临时知识候选并在结束时拒绝清理。截图输出到 `frontend/e2e/artifacts/`。如 Edge 不在默认路径，设置 `EDGE_PATH` 环境变量。
 
 数据库迁移：
 
@@ -387,4 +420,4 @@ sqlite3 backend/data/bajiu.db ".backup 'backend/data/backups/manual.db'"
 - GitHub 源 URL 仅允许 `github.com` / `raw.githubusercontent.com` / `api.github.com`；牛客仅允许 `nowcoder.com` / `www.nowcoder.com` 且仅 https；均拒绝私网/任意主机（SSRF 防护）。
 - 爬虫仅抓公开内容、限频、遵守 `robots.txt`、记录来源、不绕过登录/付费；个人学习不商用。
 - Markdown/答案以纯文本渲染，不使用 `v-html`；导入文件限制大小/扩展名/MIME。
-- AI 功能未接入，不会把答题记录发送给任何 LLM。
+- AI 默认关闭；配置 Key 后只发送待审/题目/知识正文，不发送个人笔记与用户答题原文；Key 只从环境变量读取，不落库、不回显；AI 输出只作为建议记录，不直接进入正式题库。AI 不可用时自动提示转人工质检，核心流程不受影响。

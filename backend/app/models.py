@@ -491,3 +491,73 @@ class AuditLog(Base):
     target_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class AiPromptVersion(Base):
+    __tablename__ = "ai_prompt_versions"
+    __table_args__ = (
+        UniqueConstraint("name", "version", name="uq_ai_prompt_name_version"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    version: Mapped[str] = mapped_column(String, nullable=False)
+    template: Mapped[str] = mapped_column(Text, nullable=False)
+    schema_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class AiCall(Base):
+    __tablename__ = "ai_calls"
+    __table_args__ = (
+        Index("idx_ai_calls_created", "created_at"),
+        Index("idx_ai_calls_purpose", "purpose", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    purpose: Mapped[str] = mapped_column(String, nullable=False)
+    prompt_version_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("ai_prompt_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    model: Mapped[str] = mapped_column(String, default="", nullable=False)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cost: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    error_code: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class AiCache(Base):
+    __tablename__ = "ai_cache"
+
+    cache_key: Mapped[str] = mapped_column(String, primary_key=True)
+    prompt_version_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("ai_prompt_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    response_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class QualityCheck(Base):
+    __tablename__ = "quality_checks"
+    __table_args__ = (
+        Index("idx_quality_target", "target_type", "target_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    target_type: Mapped[str] = mapped_column(String, nullable=False)
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    issues_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    overall_risk: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    model: Mapped[str] = mapped_column(String, default="", nullable=False)
+    prompt_version_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("ai_prompt_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    error_code: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
