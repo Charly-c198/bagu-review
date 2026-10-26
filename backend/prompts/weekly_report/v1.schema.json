@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "highlights", "weak_points", "plan"],
+  "properties": {
+    "summary": {"type": "string"},
+    "highlights": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {"type": "string"}
+    },
+    "weak_points": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "reason", "suggestion"],
+        "properties": {
+          "label": {"type": "string"},
+          "reason": {"type": "string"},
+          "suggestion": {"type": "string"}
+        }
+      }
+    },
+    "plan": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {"type": "string"}
+    }
+  }
+}

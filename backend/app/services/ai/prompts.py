@@ -19,6 +19,13 @@ from ...models import AiPromptVersion
 
 PROMPTS_DIR = BASE_DIR / "prompts"
 QUALITY_CHECK = ("quality_check", "v1")
+TAG_SUGGEST = ("tag_suggest", "v1")
+MISTAKE_ANALYSIS = ("mistake_analysis", "v1")
+ANSWER_POLISH = ("answer_polish", "v1")
+QUESTION_GENERATE = ("question_generate", "v1")
+INTERVIEW_SCORE = ("interview_score", "v1")
+INTERVIEW_REPORT = ("interview_report", "v1")
+WEEKLY_REPORT = ("weekly_report", "v1")
 logger = logging.getLogger("bajiu.ai.prompts")
 
 

@@ -28,3 +28,7 @@ frontend/e2e/artifacts/
 .vscode/
 .DS_Store
 *.log
+
+# 根目录本地文档（仅 README 入库；backend 下的提示词/种子 md 是代码，不受影响）
+/*.md
+!/README.md

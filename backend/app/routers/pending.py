@@ -27,6 +27,7 @@ from ..services.ai.quality import (
     quality_summary,
     serialize_quality_check,
 )
+from ..services.ai.suggestions import latest_suggestions, serialize_suggestion
 from ..services.audit import audit
 from ..services.categories import (
     category_map,
@@ -275,6 +276,12 @@ def get_pending(
     data["quality_checks"] = [
         serialize_quality_check(row)
         for row in latest_checks(db, "pending", item_id)
+    ]
+    data["ai_suggestions"] = [
+        serialize_suggestion(row)
+        for row in latest_suggestions(
+            db, target_type="pending", target_id=item_id, limit=10
+        )
     ]
     if item.item_type == "question":
         data["suggested_knowledge"] = _suggested_knowledge(db, item)

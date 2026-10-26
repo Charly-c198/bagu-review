@@ -60,6 +60,12 @@ const router = createRouter({
       meta: { title: '考前冲刺', crumb: '忽略到期日期 · 按频率抽题', section: '学习' },
     },
     {
+      path: '/interview',
+      name: 'interview',
+      component: () => import('../views/InterviewView.vue'),
+      meta: { title: '仿真面试', crumb: '随机组卷 · 文字作答 · 复盘报告', section: '学习' },
+    },
+    {
       path: '/library',
       name: 'library',
       component: () => import('../views/LibraryView.vue'),
@@ -100,6 +106,12 @@ const router = createRouter({
       name: 'graph',
       component: () => import('../views/GraphView.vue'),
       meta: { title: '知识图谱', crumb: '题-知识关联网络', section: '分析与设置' },
+    },
+    {
+      path: '/weekly',
+      name: 'weekly',
+      component: () => import('../views/WeeklyView.vue'),
+      meta: { title: '周学习报告', crumb: '薄弱点 · 下周计划', section: '分析与设置' },
     },
     {
       path: '/settings',

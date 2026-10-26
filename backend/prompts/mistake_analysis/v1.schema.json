@@ -1,0 +1,37 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["explanation", "pitfalls", "follow_ups", "related_knowledge", "confidence"],
+  "properties": {
+    "explanation": {"type": "string"},
+    "pitfalls": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {"type": "string"}
+    },
+    "follow_ups": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "items": {"type": "string"}
+    },
+    "related_knowledge": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "why"],
+        "properties": {
+          "title": {"type": "string"},
+          "why": {"type": "string"}
+        }
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}

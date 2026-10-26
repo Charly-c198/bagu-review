@@ -8,6 +8,12 @@ const EDGE =
   process.env.EDGE_PATH ||
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
 
+/**
+ * BAJIU_SEGMENT：full（默认）| dashboard | m3a | m3b。
+ * 非 full 时复用浏览器上下文里的已有 token，只跑指定片段，便于定位失败点。
+ */
+const SEGMENT = process.env.BAJIU_SEGMENT || 'full'
+
 const here = path.dirname(fileURLToPath(import.meta.url))
 const artifacts = path.join(here, 'artifacts')
 await mkdir(artifacts, { recursive: true })
@@ -67,13 +73,32 @@ async function rejectPending(ids) {
   }
 }
 
-async function apiTotal(path) {
-  return page.evaluate(async (url) => {
+async function apiTotal(url) {
+  return page.evaluate(async (target) => {
     const token = localStorage.getItem('bajiu_token')
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    const response = await fetch(target, { headers: { Authorization: `Bearer ${token}` } })
     const payload = await response.json()
     return payload?.data?.total ?? 0
-  }, path)
+  }, url)
+}
+
+/** 在页面上下文里直接调接口，返回完整响应体；用于准备/清理 E2E 数据。 */
+async function apiCall(method, url, body) {
+  return page.evaluate(
+    async ({ method: verb, url: target, body: payload }) => {
+      const token = localStorage.getItem('bajiu_token')
+      const response = await fetch(target, {
+        method: verb,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: payload === undefined ? undefined : JSON.stringify(payload),
+      })
+      return response.json()
+    },
+    { method, url, body },
+  )
 }
 
 async function waitQuestionRows(expected) {
@@ -88,22 +113,34 @@ async function waitQuestionRows(expected) {
   )
 }
 
-try {
+async function enterApp() {
   await page.goto(BASE, { waitUntil: 'networkidle' })
+  if (SEGMENT !== 'full') {
+    const token = await page.evaluate(() => localStorage.getItem('bajiu_token'))
+    if (token) {
+      await page.goto(`${BASE}/#/dashboard`, { waitUntil: 'networkidle' })
+      await page.waitForSelector('.board-banner', { timeout: 15000 })
+      return
+    }
+    // 全新浏览器上下文没有 token：走一次正常登录。
+  }
   await page.waitForSelector('#username', { timeout: 15000 })
   await page.screenshot({ path: path.join(artifacts, '01-login.png'), fullPage: true })
-
   await page.getByRole('button', { name: '进入系统' }).click()
   await page.waitForSelector('.board-banner', { timeout: 15000 })
   await page.waitForTimeout(800)
   await page.screenshot({ path: path.join(artifacts, '02-dashboard.png'), fullPage: true })
+}
 
+const summary = {}
+
+async function runDashboardSegment() {
   const dashboardText = await page.locator('#main').innerText()
   if (!dashboardText.includes('今日到期')) throw new Error('仪表盘缺少今日到期指标')
 
   await nav('主动刷题')
   await page.waitForSelector('.pcard', { timeout: 10000 })
-  const practiceStem = await page.locator('.p-stem').first().innerText()
+  summary.practiceStem = await page.locator('.p-stem').first().innerText()
   await page.getByRole('button', { name: '显示答案' }).click()
   await page.waitForSelector('.panswer', { timeout: 10000 })
   const answerText = await page.locator('.panswer').innerText()
@@ -176,6 +213,12 @@ try {
     if (!paginationText.includes(`共 ${allTotal} 条`)) throw new Error('重置后未恢复全部题目')
   }
   await page.screenshot({ path: path.join(artifacts, '09-library-multiselect.png'), fullPage: true })
+  summary.filters = {
+    allTotal,
+    difficulties: [firstDifficulty, secondDifficulty],
+    firstCount: difficultyCounts[firstDifficulty],
+    multiCount: multiExpectedTotal,
+  }
 
   await nav('知识库')
   await page.waitForSelector('table tbody tr', { timeout: 10000 })
@@ -214,6 +257,13 @@ try {
   if (countAfterSelectAll !== pendingCount) throw new Error(`全选后数量应为 ${pendingCount}，实际 ${countAfterSelectAll}`)
   if (countAfterUnselect !== pendingCount - 1) throw new Error('取消一项后数量未减 1')
   await page.screenshot({ path: path.join(artifacts, '07-pending-bulk.png'), fullPage: true })
+  summary.bulk = {
+    pendingCount,
+    disabledBeforeSelect: bulkDisabledBefore,
+    countAfterSelect,
+    countAfterSelectAll,
+    countAfterUnselect,
+  }
 
   // 人工质检通道：AI 未配置时也必须完整可用
   await page.locator('.pend-item').first().getByRole('button', { name: '详情' }).click()
@@ -285,12 +335,13 @@ try {
   const graphText = await page.locator('#main').innerText()
   if (!graphText.includes('知识图谱')) throw new Error('知识图谱页未渲染')
   await page.screenshot({ path: path.join(artifacts, '08-graph.png'), fullPage: true })
+  summary.graph = { nodeCount: graphNodeCount }
 
   await nav('设置')
   await page.waitForTimeout(700)
   const settingsText = await page.locator('#main').innerText()
   if (!settingsText.includes('SM-2 间隔重复参数')) throw new Error('设置页未渲染')
-  if (!settingsText.includes('AI 能力（M3a）')) throw new Error('设置页缺少 AI 状态')
+  if (!settingsText.includes('AI 能力（M3a / M3b）')) throw new Error('设置页缺少 AI 状态')
   if (!settingsText.includes('BAJIU_AI_BASE_URL')) throw new Error('设置页缺少 AI 配置说明')
   await page.screenshot({ path: path.join(artifacts, '05-settings.png'), fullPage: true })
 
@@ -307,29 +358,111 @@ try {
   }
   await nav('考前冲刺')
   await page.waitForSelector('.board-banner', { timeout: 10000 })
+}
 
-  console.log(JSON.stringify({
-    ok: true,
-    practiceStem,
-    pendingCount,
-    bulk: {
-      pendingCount,
-      disabledBeforeSelect: bulkDisabledBefore,
-      countAfterSelect,
-      countAfterSelectAll,
-      countAfterUnselect,
-    },
-    filters: {
-      allTotal,
-      difficulties: [firstDifficulty, secondDifficulty],
-      firstCount: difficultyCounts[firstDifficulty],
-      multiCount: multiExpectedTotal,
-    },
-    graph: {
-      nodeCount: graphNodeCount,
-    },
-    problems,
-  }, null, 2))
+async function runM3aSegment() {
+  // M3a：待审详情的 AI 打标建议面板；未配置 AI 时给出确切原因，人工通道不受影响。
+  const pending = (await apiCall('GET', '/api/v1/pending?status=pending&page_size=1'))?.data?.items?.[0]
+  if (pending) {
+    await nav('采集待审')
+    await page.waitForSelector('.pend-item', { timeout: 10000 })
+    await page
+      .locator('.pend-item', { hasText: pending.stem || pending.knowledge_title || '' })
+      .first()
+      .getByRole('button', { name: '详情' })
+      .click()
+    await page.waitForSelector('.modal-card .ai-suggest-panel', { timeout: 10000 })
+    const panelText = await page.locator('.ai-suggest-panel').innerText()
+    if (!panelText.includes('AI 打标建议')) throw new Error('待审详情缺少 AI 打标建议面板')
+    const aiConfigured = await page.evaluate(async () => {
+      const token = localStorage.getItem('bajiu_token')
+      const response = await fetch('/api/v1/ai/status', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      return (await response.json())?.data?.configured === true
+    })
+    if (!aiConfigured) {
+      await page.locator('.ai-suggest-panel').getByRole('button', { name: '生成打标建议' }).click()
+      await page.waitForSelector('.ai-suggest-failed', { timeout: 15000 })
+      const failedText = await page.locator('.ai-suggest-panel').innerText()
+      if (!failedText.includes('未配置 AI')) throw new Error(`未配置 AI 时未给出降级提示：${failedText}`)
+    }
+    await page.screenshot({ path: path.join(artifacts, '11-ai-tagging.png'), fullPage: true })
+    await page.locator('.modal-card .modal-close').last().click()
+    await page.waitForTimeout(300)
+  }
+
+  // 题目详情包含答案润色与错题解析面板（只渲染入口，不调用 AI）。
+  await nav('题库管理')
+  await page.waitForSelector('table tbody tr', { timeout: 10000 })
+  await page.locator('table tbody tr').first().getByRole('button', { name: '详情' }).click()
+  await page.waitForSelector('.modal-card .ai-suggest-panel', { timeout: 10000 })
+  const libraryAiText = await page.locator('.modal-card').innerText()
+  if (!libraryAiText.includes('AI 答案润色') || !libraryAiText.includes('AI 错题解析')) {
+    throw new Error('题目详情缺少答案润色/错题解析入口')
+  }
+  await page.locator('.modal-card .modal-close').click()
+}
+
+async function runM3bSegment() {
+  // M3b：仿真面试（不勾选 AI 同意，全程本地评分，报告走基础版）。
+  const total = (await apiCall('GET', '/api/v1/questions?status=active&page_size=1'))?.data?.total ?? 0
+  if (!total) throw new Error('题库为空，无法进行面试冒烟')
+  await nav('仿真面试')
+  await page.getByRole('button', { name: '+ 开始仿真面试' }).click()
+  await page.waitForSelector('.modal-card', { timeout: 10000 })
+  await page.locator('.modal-card select').first().selectOption('3')
+  await page.locator('.modal-card').getByRole('button', { name: '随机组卷并开始' }).click()
+  await page.waitForSelector('.iv-main .iv-stem', { timeout: 15000 })
+  const ivQuestion = await page.locator('.iv-main .iv-stem').innerText()
+  if (!ivQuestion.trim()) throw new Error('面试题干为空')
+  await page
+    .locator('.iv-main textarea.iv-answer')
+    .first()
+    .fill('E2E 作答：先给结论，再讲原理与边界条件。')
+  await page.locator('.iv-main').getByRole('button', { name: '提交作答' }).click()
+  // 提交后停留在当前题展示评分与追问，再手动进入下一题。
+  await page.waitForSelector('.iv-main .iv-answer-readonly', { timeout: 15000 })
+  await page.locator('.iv-main .iv-score-row select').selectOption('4')
+  await page.locator('.iv-main').getByRole('button', { name: '保存评分' }).click()
+  await page.waitForSelector('.iv-main .iv-score-row .tag.green', { timeout: 10000 })
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: '结束面试并生成报告' }).click()
+  await page.waitForSelector('.iv-report-head', { timeout: 30000 })
+  const reportText = await page.locator('.modal-card').innerText()
+  if (!reportText.includes('面试复盘报告') || !reportText.includes('80')) {
+    throw new Error(`面试报告未正确渲染：${reportText.slice(0, 200)}`)
+  }
+  await page.screenshot({ path: path.join(artifacts, '12-interview-report.png'), fullPage: true })
+  await page.locator('.modal-card .modal-close').last().click()
+  await page.waitForTimeout(500)
+  if (!(await page.locator('#main .list-row').count())) {
+    throw new Error('面试结束后历史记录未刷新')
+  }
+
+  // M3b：周报告基础版（AI 不可用时也必须有内容）。
+  await nav('周学习报告')
+  await page.waitForTimeout(600)
+  await page.locator('.weekly-page select').first().selectOption('basic')
+  await page.locator('.weekly-page').getByRole('button', { name: '生成本周报告' }).click()
+  await page.waitForSelector('.weekly-main .weekly-summary', { timeout: 20000 })
+  const weeklyText = await page.locator('.weekly-main').innerText()
+  if (!weeklyText.includes('学习周报') || !weeklyText.includes('下周计划')) {
+    throw new Error(`周报告内容不完整：${weeklyText.slice(0, 200)}`)
+  }
+  if (!(await page.locator('.weekly-list-item').count())) {
+    throw new Error('周报告历史列表为空')
+  }
+  await page.screenshot({ path: path.join(artifacts, '13-weekly.png'), fullPage: true })
+}
+
+try {
+  await enterApp()
+  if (SEGMENT === 'full' || SEGMENT === 'dashboard') await runDashboardSegment()
+  if (SEGMENT === 'full' || SEGMENT === 'm3a') await runM3aSegment()
+  if (SEGMENT === 'full' || SEGMENT === 'm3b') await runM3bSegment()
+
+  console.log(JSON.stringify({ ok: true, segment: SEGMENT, ...summary, problems }, null, 2))
   if (problems.length) process.exitCode = 1
 } catch (error) {
   await page.screenshot({ path: path.join(artifacts, 'failure.png'), fullPage: true })

@@ -1,0 +1,33 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "highlights", "gaps", "advice", "weak_question_ids", "next_steps"],
+  "properties": {
+    "summary": {"type": "string"},
+    "highlights": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {"type": "string"}
+    },
+    "gaps": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {"type": "string"}
+    },
+    "advice": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {"type": "string"}
+    },
+    "weak_question_ids": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {"type": "integer"}
+    },
+    "next_steps": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {"type": "string"}
+    }
+  }
+}

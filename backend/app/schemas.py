@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -240,3 +241,54 @@ class QualityCheckRequest(BaseModel):
 class QualityTargetRequest(QualityCheckRequest):
     target_type: Literal["question", "knowledge", "pending"]
     target_id: int = Field(ge=1)
+
+
+# ---- M3a Slice 2/3：AI 建议 ---------------------------------------------
+
+
+class AiSuggestionRequest(BaseModel):
+    kind: Literal["tagging", "mistake_analysis", "answer_polish"]
+    target_type: Literal["pending", "question", "knowledge"] = "pending"
+    target_id: int = Field(ge=1)
+    # 仅在用户显式同意时附带作答原文；默认不发送任何用户输入。
+    user_answer: str | None = Field(default=None, max_length=4000)
+    consent: bool = False
+
+
+class QuestionGenerateRequest(BaseModel):
+    knowledge_id: int | None = Field(default=None, ge=1)
+    topic: str | None = Field(default=None, max_length=200)
+    category_path: str | None = Field(default=None, max_length=255)
+    count: int = Field(default=3, ge=1, le=10)
+    difficulty: int | None = Field(default=None, ge=1, le=5)
+
+
+# ---- M3b：仿真面试与周报告 ---------------------------------------------
+
+
+class InterviewCreateRequest(BaseModel):
+    count: int = Field(default=5, ge=1, le=20)
+    duration_min: int = Field(default=30, ge=5, le=180)
+    category_ids: list[int] = Field(default_factory=list)
+    difficulties: list[int] = Field(default_factory=list)
+    frequencies: list[Frequency] = Field(default_factory=list)
+    ai_consent: bool = False
+
+
+class InterviewAnswerRequest(BaseModel):
+    question_id: int = Field(ge=1)
+    answer_text: str = Field(min_length=1, max_length=20000)
+
+
+class InterviewScoreRequest(BaseModel):
+    score: int = Field(ge=0, le=5)
+    feedback: str | None = Field(default=None, max_length=8000)
+
+
+class InterviewFollowUpRequest(BaseModel):
+    answer_text: str = Field(min_length=1, max_length=20000)
+
+
+class WeeklyReportRequest(BaseModel):
+    week_start: date | None = None
+    mode: Literal["auto", "basic"] = "auto"

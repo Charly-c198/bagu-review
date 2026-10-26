@@ -204,6 +204,8 @@ tr:last-child td { border-bottom: none; }
 .error-list { margin: 10px 0 0; padding-left: 18px; color: var(--orange); font-size: 13.5px; }
 .error-list li { margin: 4px 0; }
 .log-box { background: #101917; color: #cfe3e3; border-radius: 10px; padding: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; white-space: pre-wrap; max-height: 260px; overflow-y: auto; }
+.ai-tip { font-size: 12.5px; color: var(--amber); background: var(--amber-bg); border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; }
+.suggestion-text { font-size: 13px; color: var(--ink2); white-space: pre-wrap; }
 
 /* ===== 登录 ===== */
 .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at 20% 20%, #e6f1f1 0, var(--bg) 45%); padding: 20px; }

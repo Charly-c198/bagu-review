@@ -1,10 +1,10 @@
 # 八股文智能复习系统
 
-个人专属的面试八股文记忆 + 间隔重复（SM-2）+ 题库/知识库 Web 系统。按《八股文智能复习系统_项目文档_V0.4》的 **M1（P0）**、**M2 指定范围**（牛客爬虫、FTS5 全文搜索、统计可视化增强、多维筛选增强、知识图谱基础版）与 **M3a Slice 1**（AI 网关 + 题目/知识质量审查 + 人工质检兜底）实现，本地优先、单用户、无 AI 也能完整使用。
+个人专属的面试八股文记忆 + 间隔重复（SM-2）+ 题库/知识库 Web 系统。按《八股文智能复习系统_项目文档_V0.4》的 **M1（P0）**、**M2 指定范围**（牛客爬虫、FTS5 全文搜索、统计可视化增强、多维筛选增强、知识图谱基础版）与 **M3 全部范围**（M3a：AI 网关、质量审查、自动打标、错题解析、答案润色；M3b：AI 出题、文字仿真面试、周学习报告）实现，本地优先、单用户、无 AI 也能完整使用。
 
 前端在原型 HTML 的基础上迁移为 Vue 3 + TypeScript + Vite + Pinia，保留原型的设计语言（青绿主题、侧边栏、卡片、刷题卡、SVG 趋势图），并补齐登录、知识库、收藏夹、采集任务、规则打标、备份恢复等页面。
 
-> 接手/继续开发：先阅读 [`M3_HANDOFF.md`](M3_HANDOFF.md)（当前 M3a Slice 1 状态与 AI 配置）、[`M2_HANDOFF.md`](M2_HANDOFF.md)（M2 进度与坑）和 [`NEW_SESSION_HANDOFF.md`](NEW_SESSION_HANDOFF.md)（M1 背景与运行约定）。
+> 接手/继续开发：先阅读 [`M3_HANDOFF.md`](M3_HANDOFF.md)（M3 全貌、AI 配置与坑）、[`M2_HANDOFF.md`](M2_HANDOFF.md)（M2 进度与坑）和 [`NEW_SESSION_HANDOFF.md`](NEW_SESSION_HANDOFF.md)（M1 背景与运行约定）。
 
 ---
 
@@ -53,6 +53,20 @@
 - **隐私**：AI 输入不包含题目个人笔记与用户答题原文；Key 只从环境变量读取，不落库、不回显。
 - **状态入口**：设置页展示 AI 配置、模型、本月用量与缓存命中；接口 `GET /api/v1/ai/status`。
 
+### M3a Slice 2/3（自动打标 / 错题解析 / 答案润色）
+
+- **AI 建议表** `ai_suggestions`：所有增强输出先落库，**用户显式“应用”后才修改**待审建议元数据或正式题目；失败也保留记录与错误码，可重新生成。
+- **自动打标建议**：待审详情中“规则建议”与“AI 建议”分开显示；AI 参考现有分类路径与标签，给出分类、标签、难度、频率、置信度与理由。应用时合并标签、覆盖分类/难度/频率，规则命中记录保留。
+- **错题解析**：题目详情与错题本均可发起；输出拓展讲解、易错点、2–3 个自测追问与相关知识点。默认只发送题干/答案/要点，**只有勾选同意才发送作答原文**。
+- **答案润色**：题目详情生成“面试可口述”版本与要点；预览后由用户确认替换参考答案，不自动改题。
+
+### M3b（AI 出题 / 仿真面试 / 周报告）
+
+- **AI 题库生产**：知识详情按知识点生成题目（数量、难度可选），**一律写入 `pending_items`（source_type=ai）**，人工审核后才入正式题库；重复题干自动跳过。
+- **文字仿真面试**：按分类/难度/频率随机组卷，题量与时长可配；逐题文字作答、倒计时、逐题评分与追问；**作答原文默认不发送 AI**，创建会话时显式勾选同意才启用 AI 评分；未同意或 AI 失败时作答仍保存，可手动评分。
+- **复盘报告**：总分、逐题得分、亮点、知识缺口、建议与下一步；AI 复盘失败自动降级为基础报告。结束时按评分回写 SM-2 掌握记录，低于 3 分自动进入错题本。
+- **周学习报告**：统计本周自评量、正确率、活跃天数、新学、错题、分类正确率与面试表现；AI 生成薄弱点与下周计划，AI 不可用时生成本地统计版；同一周重复生成覆盖同一条记录。
+
 ### 设置 / 数据
 - SM-2 参数、每日上限、提前复习、导入直接入库、手动新建进待审、去重阈值、爬虫单次文件数等可配置。
 - 导出 JSON / Markdown（可回环导入，含知识条目与关联）。
@@ -61,8 +75,6 @@
 - Docker Compose：nginx 静态前端 + FastAPI 单 worker + 命名卷 SQLite。
 
 ### 尚未实现（按文档后置）
-- M3a 其余：自动打标、错题解析、答案润色（网关与质量审查已在 Slice 1 落地）。
-- M3b：题目生产、文字仿真面试、周报告（依赖会话/报告表，单独排期）。
 - M2 其余项：定时调度、xlsx 导入导出、PostgreSQL（按用户要求本轮不做）。
 - M4：TTS/ASR、多人化、移动端。
 
@@ -77,7 +89,7 @@ bajiu-review/
 │  │  ├─ main.py                 FastAPI 入口 / 异常包 / 静态托管
 │  │  ├─ config.py               环境变量与路径
 │  │  ├─ database.py             SQLAlchemy / SQLite PRAGMA
-│  │  ├─ models.py               25 张业务表（对应文档第 7 章）
+│  │  ├─ models.py               34 张业务表（对应文档第 7 章与附录 B）
 │  │  ├─ security.py             bcrypt / 会话 / 限流 / CSRF
 │  │  ├─ routers/                auth、题库、知识、导入、爬虫、待审、复习、统计、图谱…
 │  │  ├─ services/               SM-2、导入解析、去重、规则打标、爬虫（GitHub/牛客）、FTS、多维筛选、审核管线…
@@ -265,6 +277,16 @@ python -m app.seed_demo --reset  # 删除当前数据库并重建（会丢数据
 - 预算按当月 `ai_calls` 的 success/failed token 合计计算；达到上限后拒绝新调用，缓存命中不消耗 token。
 - 相关接口：`POST /pending/{id}/quality-check`、`POST /quality/check`、`GET /quality-checks`、`POST /quality-checks/{id}/retry`、`GET /ai/status`。
 
+### 5.7 M3a 增强与 M3b 口径
+
+- **建议与应用分离**：打标、错题解析、答案润色全部先写 `ai_suggestions`；打标应用只合并 `suggested_meta`，润色应用才覆盖题目答案与要点，错题解析只读。失败记录保留 `error_code`，可重新生成。
+- **AI 出题**：只能写 `pending_items`，`source_type='ai'`；题干哈希与正式题/待审重复时跳过；审核通过后走正常入库与来源溯源流程。
+- **真实模型耗时**（`qwen3.8-max`）：打标 15s、错题解析 60s、润色 43s、出题 40s、面试评分 21–41s、复盘 44s、周报 90s；建议 `BAJIU_AI_TIMEOUT_SEC=120`，周报可设 180。复跑脚本：`python scripts/smoke_m3_ai.py`（建议在演示库副本上运行）。
+- **仿真面试评分**：AI 评分只在会话创建时勾选同意后启用；未同意时作答保存为未评分，由用户手动评分。AI 评分失败也会先保存作答，再提示手动评分；报告请求只含题目、评分与反馈，不含作答原文。
+- **结束面试回写**：每题评分写入 `mastery_records`（`mode=interview`）并推进 SM-2；低于 3 分自动加入错题本。报告 AI 失败时生成基础报告，不阻塞结束。
+- **周报告**：按本地周一至周日统计；同一 `week_start` 覆盖更新；AI 失败自动降级基础版，并在响应中带 `ai_error_code`。
+- 相关接口：`POST /ai/suggestions`、`GET /ai/suggestions`、`POST /ai/suggestions/{id}/apply`、`POST /ai/generate-questions`、`POST/GET /interview/sessions`、`POST /interview/sessions/{id}/answers`、`PATCH /interview/sessions/{id}/turns/{turn_id}`、`POST /interview/sessions/{id}/finish`、`POST /interview/sessions/{id}/abort`、`POST/GET /reports/weekly`。
+
 ---
 
 ## 6. 测试
@@ -285,8 +307,10 @@ python -m pytest -q
 - Markdown XSS 纯文本存储、前端无 `v-html`、Alembic 空库迁移与表覆盖检查（`tests/test_ops.py`）。
 - **M2**：FTS5 中英文/短查询回退/增删改同步（`test_fts.py`）、多值筛选维度内 OR 与维度间 AND（`test_filters.py`）、统计热力图/分类掌握度与知识图谱节点边/聚焦（`test_m2_stats_graph.py`）、牛客 URL/robots/HTML 提取/编号问答/任务管线（`test_nowcoder.py` + HTML fixture）。
 - **M3a Slice 1**：AI 质检成功、AI 失败转人工、人工质检、重试、未配置降级、隐私输入裁剪、AI 状态不泄露 Key（`test_ai_quality.py`）；网关缓存、429/5xx 重试、Schema 修复、月预算（MockTransport，不访问真实网络）。
+- **M3a Slice 2/3**：打标建议成功/失败/应用/重复应用、失败不改建议元数据、答案润色应用、错题解析隐私（默认不含作答与笔记）、AI 出题进待审与重复跳过（`test_m3_suggestions.py`）。
+- **M3b**：组卷不下发答案、AI 评分与追问、结束回写错题本与 interview 掌握记录、AI 失败保留作答+手动评分+基础报告、未同意不调用 AI、中止与题量不足、周报告基础版/AI 版/降级覆盖（`test_m3_interview.py`、`test_m3_weekly.py`）。
 
-当前结果：后端 `76 passed`（约 65s），`ruff check app tests` 通过，前端 `npm run build` 与 E2E 均通过。
+当前结果：后端 `90 passed`（约 80s），`ruff check app tests` 通过，前端 `npm run build` 与 E2E（含 M3a 建议面板、仿真面试基础报告、周报告）均通过，E2E `problems: []`。
 
 一键本地检查（与 CI 同口径：ruff + pytest + 前端构建，可选 `-WithE2E` / `--with-e2e`）：
 

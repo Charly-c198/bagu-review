@@ -2,7 +2,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 
 import { api, withQuery } from '../api/client'
-import type { PendingItem } from '../api/types'
+import type { ApplySuggestionResult, PendingItem } from '../api/types'
+import AiSuggestPanel from '../components/AiSuggestPanel.vue'
 import Modal from '../components/Modal.vue'
 import Pagination from '../components/Pagination.vue'
 import QualityPanel from '../components/QualityPanel.vue'
@@ -230,6 +231,32 @@ async function openDetail(item: PendingItem): Promise<void> {
   } catch (err: any) {
     store.toast(err?.message || '详情加载失败', 'error')
   }
+}
+
+async function refreshDetail(): Promise<void> {
+  if (!detail.value) return
+  try {
+    detail.value = await api.get<PendingItem>(`/pending/${detail.value.id}`)
+  } catch {
+    detailOpen.value = false
+  }
+}
+
+/** AI 质检失败时，打标建议同样大概率无法调用，给出降级提示。 */
+const suggestionTip = computed(
+  () => detail.value?.quality?.status === 'needs_manual',
+)
+
+async function onSuggestionApplied(result: ApplySuggestionResult): Promise<void> {
+  if (result.target_type === 'pending' && result.target) {
+    detail.value = {
+      ...(detail.value as PendingItem),
+      ...(result.target as PendingItem),
+      quality: detail.value?.quality,
+      ai_suggestions: detail.value?.ai_suggestions,
+    }
+  }
+  await Promise.all([load(), refreshDetail()])
 }
 
 async function approve(item: PendingItem, knowledgeIds: number[] = []): Promise<void> {
@@ -546,6 +573,16 @@ onMounted(load)
 
         <div class="section-title" style="font-size: 14px">质量审查</div>
         <QualityPanel target-type="pending" :target-id="detail.id" @checked="load" />
+
+        <div class="section-title" style="font-size: 14px">AI 增强</div>
+        <div v-if="suggestionTip" class="ai-tip">AI 质检暂不可用：AI 打标建议也可能失败，可先人工审核。</div>
+        <AiSuggestPanel
+          kind="tagging"
+          target-type="pending"
+          :target-id="detail.id"
+          :initial="detail.ai_suggestions"
+          @applied="onSuggestionApplied"
+        />
 
         <div class="section-title" style="font-size: 14px">相似内容</div>
         <div v-if="detail.similar?.length">

@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["score", "feedback", "gaps", "follow_up", "advice"],
+  "properties": {
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "feedback": {"type": "string"},
+    "gaps": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {"type": "string"}
+    },
+    "follow_up": {"type": "string"},
+    "advice": {"type": "string"}
+  }
+}

@@ -561,3 +561,100 @@ class QualityCheck(Base):
     error_code: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class AiSuggestion(Base):
+    """M3a Slice 2/3：自动打标、错题解析、答案润色等建议记录。
+
+    AI 输出只写本表；用户显式“应用”后才修改 suggested_meta 或正式题目。
+    """
+
+    __tablename__ = "ai_suggestions"
+    __table_args__ = (
+        Index(
+            "idx_ai_suggestions_target",
+            "kind",
+            "target_type",
+            "target_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    target_type: Mapped[str] = mapped_column(String, nullable=False)
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="success", nullable=False)
+    result_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    model: Mapped[str] = mapped_column(String, default="", nullable=False)
+    prompt_version_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("ai_prompt_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    error_code: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class InterviewSession(Base):
+    """M3b 文字仿真面试会话。config_json 保存题序、时长与筛选条件。"""
+
+    __tablename__ = "interview_sessions"
+    __table_args__ = (Index("idx_interview_sessions_status", "status", "started_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    config_json: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="in_progress", nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class InterviewTurn(Base):
+    """逐题作答与评分。score 为空表示尚未评分（可手动补分）。"""
+
+    __tablename__ = "interview_turns"
+    __table_args__ = (
+        UniqueConstraint("session_id", "question_id", name="uq_interview_turn"),
+        Index("idx_interview_turns_session", "session_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("questions.id", ondelete="CASCADE"), nullable=False
+    )
+    answer_text: Mapped[str] = mapped_column(Text, nullable=False)
+    follow_up: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    follow_up_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    feedback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    gaps_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    scored_by: Mapped[str] = mapped_column(String, default="none", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    scored_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class InterviewReport(Base):
+    __tablename__ = "interview_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+    )
+    total_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    report_json: Mapped[str] = mapped_column(Text, nullable=False)
+    generated_by: Mapped[str] = mapped_column(String, default="basic", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class WeeklyReport(Base):
+    __tablename__ = "weekly_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    week_start: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    report_json: Mapped[str] = mapped_column(Text, nullable=False)
+    generated_by: Mapped[str] = mapped_column(String, default="basic", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)

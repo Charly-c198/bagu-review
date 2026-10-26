@@ -132,6 +132,7 @@ export interface PendingItem {
   }[]
   quality?: QualitySummary
   quality_checks?: QualityCheck[]
+  ai_suggestions?: AiSuggestion[]
   [key: string]: unknown
 }
 
@@ -387,4 +388,173 @@ export interface AIStatus {
   }
   prompt_versions: { name: string; version: string }[]
   env: string[]
+}
+
+// ---- M3a Slice 2/3 + M3b ------------------------------------------------
+
+export type SuggestionKind = 'tagging' | 'mistake_analysis' | 'answer_polish'
+
+export interface TagSuggestionResult {
+  category_path: string
+  tags: string[]
+  difficulty: number | null
+  frequency: string | null
+  confidence: number | null
+  rationale: string
+}
+
+export interface MistakeAnalysisResult {
+  explanation: string
+  pitfalls: string[]
+  follow_ups: string[]
+  related_knowledge: { title: string; why: string }[]
+  confidence: number | null
+}
+
+export interface AnswerPolishResult {
+  polished_answer: string
+  key_points: string[]
+  changes: string[]
+  confidence: number | null
+}
+
+export type SuggestionResult =
+  | TagSuggestionResult
+  | MistakeAnalysisResult
+  | AnswerPolishResult
+
+export interface AiSuggestion {
+  id: number
+  kind: SuggestionKind
+  target_type: 'pending' | 'question' | 'knowledge'
+  target_id: number
+  status: 'success' | 'failed'
+  // 各 kind 的结构不同，结果按 kind 判定后在面板里收窄。
+  result: Record<string, any> | null
+  model: string
+  prompt_version_id: number | null
+  error_code: string | null
+  created_at: string
+  applied_at: string | null
+}
+
+export interface ApplySuggestionResult {
+  suggestion: AiSuggestion
+  target_type: 'pending' | 'question'
+  target: PendingItem | Question
+}
+
+export interface GenerateQuestionsResult {
+  requested: number
+  generated: number
+  skipped: number
+  topic: string
+  knowledge_id: number | null
+  items: PendingItem[]
+}
+
+export interface InterviewTurn {
+  id: number
+  session_id: number
+  question_id: number
+  question_stem: string
+  answer_text: string
+  follow_up: string | null
+  follow_up_answer: string | null
+  score: number | null
+  feedback: string | null
+  gaps: string[]
+  scored_by: 'ai' | 'manual' | 'none'
+  created_at: string
+  scored_at: string | null
+  reference_answer?: string | null
+  reference_key_points?: string[]
+  index?: number
+}
+
+export interface InterviewAnswerState {
+  status: 'draft' | 'pending' | 'scored'
+  answer_text: string
+  score: number | ''
+  feedback: string
+  turn: InterviewTurn | null
+}
+
+export interface InterviewReport {
+  id: number
+  session_id: number
+  total_score: number
+  average_score: number
+  answered: number
+  scored: number
+  total: number
+  generated_by: 'ai' | 'basic'
+  summary: string
+  highlights: string[]
+  gaps: string[]
+  advice: string[]
+  next_steps: string[]
+  weak_question_ids: number[]
+  ai_error_code: string | null
+  per_question: {
+    question_id: number
+    index: number
+    stem: string
+    score: number | null
+    feedback: string
+    gaps: string[]
+    scored_by: string
+    follow_up: string | null
+    follow_up_answered: boolean
+  }[]
+  created_at?: string
+}
+
+export interface InterviewSession {
+  id: number
+  status: 'in_progress' | 'finished' | 'aborted'
+  started_at: string
+  finished_at: string | null
+  config: {
+    count: number
+    duration_min: number
+    ai_consent: boolean
+    category_ids: number[]
+    difficulties: number[]
+    frequencies: string[]
+  }
+  questions?: Question[]
+  turns?: InterviewTurn[]
+  report?: InterviewReport | null
+  total_score?: number | null
+  progress: {
+    total: number
+    answered: number
+    scored: number
+    average_score: number | null
+  }
+}
+
+export interface WeeklyReport {
+  id: number
+  week_start: string
+  week_end: string
+  generated_by: 'ai' | 'basic'
+  created_at: string
+  ai_error_code: string | null
+  summary: string
+  highlights: string[]
+  weak_points: { label: string; reason: string; suggestion: string }[]
+  plan: string[]
+  reviews: number
+  correct: number
+  accuracy: number | null
+  active_days: number
+  new_learned: number
+  mastered: number
+  mistakes_added: number
+  due_total: number
+  backlog: number
+  categories: { label: string; reviews: number; accuracy: number }[]
+  interviews: { count: number; average_score: number | null }
 }

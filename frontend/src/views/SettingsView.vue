@@ -322,7 +322,7 @@ onMounted(async () => {
       </div>
 
       <div class="section-title" style="justify-content: space-between">
-        <span>AI 能力（M3a）</span>
+        <span>AI 能力（M3a / M3b）</span>
         <button class="btn ghost sm" @click="loadAIStatus">刷新状态</button>
       </div>
       <div class="card">
@@ -365,6 +365,11 @@ onMounted(async () => {
         <div class="list-sub" style="margin-top: 8px">
           配置方式：在 .env 或环境变量中设置 BAJIU_AI_BASE_URL / BAJIU_AI_API_KEY / BAJIU_AI_MODEL。
           Key 只从环境读取，不会显示在此页面。AI 失败时可在待审详情转人工质检。
+        </div>
+        <div class="list-sub" style="margin-top: 8px">
+          M3a 增强：待审详情生成打标建议（应用后才写入建议元数据）；题目详情可做错题解析与答案润色（应用后才覆盖答案）。
+          M3b：知识详情可 AI 出题（只进待审区）；仿真面试默认不发送作答原文，勾选同意后才会调用 AI 评分与复盘；
+          周报告在 AI 不可用时自动降级为本地统计版。
         </div>
       </div>
 

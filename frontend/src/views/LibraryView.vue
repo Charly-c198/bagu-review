@@ -2,7 +2,8 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { api, withQuery } from '../api/client'
-import type { Question } from '../api/types'
+import type { ApplySuggestionResult, Question } from '../api/types'
+import AiSuggestPanel from '../components/AiSuggestPanel.vue'
 import DifficultyBars from '../components/DifficultyBars.vue'
 import Modal from '../components/Modal.vue'
 import MultiSelect from '../components/MultiSelect.vue'
@@ -246,6 +247,16 @@ async function refreshDetail(): Promise<void> {
   } catch {
     detailOpen.value = false
   }
+}
+
+async function onSuggestionApplied(result: ApplySuggestionResult): Promise<void> {
+  if (result.target_type === 'question' && result.target) {
+    detail.value = {
+      ...(detail.value as Question),
+      ...(result.target as Question),
+    }
+  }
+  await Promise.all([load(), refreshDetail()])
 }
 
 async function toggleBookmark(question: Question): Promise<void> {
@@ -524,6 +535,19 @@ watch(
 
         <div class="section-title" style="font-size: 14px">AI 质量审查</div>
         <QualityPanel target-type="question" :target-id="detail.id" />
+
+        <div class="section-title" style="font-size: 14px">AI 增强（M3a）</div>
+        <AiSuggestPanel
+          kind="answer_polish"
+          target-type="question"
+          :target-id="detail.id"
+          @applied="onSuggestionApplied"
+        />
+        <AiSuggestPanel
+          kind="mistake_analysis"
+          target-type="question"
+          :target-id="detail.id"
+        />
 
         <div class="section-title" style="font-size: 14px">复习排程</div>
         <div class="list-sub">

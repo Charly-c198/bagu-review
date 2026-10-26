@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { api, withQuery } from '../api/client'
-import type { Knowledge } from '../api/types'
+import type { GenerateQuestionsResult, Knowledge } from '../api/types'
 import Modal from '../components/Modal.vue'
 import Pagination from '../components/Pagination.vue'
 import QualityPanel from '../components/QualityPanel.vue'
@@ -17,6 +18,7 @@ import {
 } from '../utils/labels'
 
 const store = useAppStore()
+const router = useRouter()
 
 const items = ref<Knowledge[]>([])
 const total = ref(0)
@@ -33,6 +35,52 @@ const detailOpen = ref(false)
 const formOpen = ref(false)
 const editingId = ref<number | null>(null)
 const saving = ref(false)
+
+// M3b 题库生产：围绕该知识点生成题目，结果一律进入待审区。
+const genOpen = ref(false)
+const genLoading = ref(false)
+const genCount = ref(3)
+const genDifficulty = ref<number | ''>('')
+const genResult = ref<GenerateQuestionsResult | null>(null)
+
+function openGenerate(item: Knowledge): void {
+  genResult.value = null
+  genCount.value = 3
+  genDifficulty.value = ''
+  genOpen.value = true
+}
+
+async function generateQuestions(item: Knowledge): Promise<void> {
+  genLoading.value = true
+  try {
+    const result = await api.post<GenerateQuestionsResult>('/ai/generate-questions', {
+      knowledge_id: item.id,
+      count: genCount.value,
+      difficulty: genDifficulty.value === '' ? null : Number(genDifficulty.value),
+    })
+    genResult.value = result
+    if (result.generated) {
+      store.toast(`已生成 ${result.generated} 道题进入待审区`, 'success')
+      await store.loadBadges()
+    } else {
+      store.toast('没有生成新题目（可能与已有题目重复）', 'info')
+    }
+  } catch (err: any) {
+    const reason =
+      err?.code === 'AI_NOT_CONFIGURED'
+        ? '未配置 AI，请在设置页检查 BAJIU_AI_* 环境变量'
+        : err?.message || '生成失败'
+    store.toast(reason, 'error')
+  } finally {
+    genLoading.value = false
+  }
+}
+
+function goPending(): void {
+  genOpen.value = false
+  detailOpen.value = false
+  router.push('/pending')
+}
 
 const form = reactive({
   title: '',
@@ -361,6 +409,14 @@ watch(
         <div class="section-title" style="font-size: 14px">AI 质量审查</div>
         <QualityPanel target-type="knowledge" :target-id="detail.id" />
 
+        <div class="section-title" style="font-size: 14px">AI 出题（M3b）</div>
+        <div class="list-sub">
+          围绕本知识点生成新题；AI 产出的题目只进入待审区，审核通过后才写入题库。
+        </div>
+        <div class="form-actions" style="justify-content: flex-start; margin-top: 10px">
+          <button class="btn ghost" @click="openGenerate(detail)">AI 生成题目</button>
+        </div>
+
         <div class="form-actions" style="margin-top: 20px">
           <button class="btn ghost" @click="openEdit(detail)">编辑</button>
           <button class="btn ghost" @click="archive(detail)">归档</button>
@@ -368,5 +424,76 @@ watch(
         </div>
       </template>
     </Modal>
+
+    <Modal :open="genOpen" title="AI 生成题目" wide @close="genOpen = false">
+      <template v-if="detail">
+        <div class="board-banner" style="margin-bottom: 14px">
+          <b>知识点</b>
+          <span>{{ detail.title }}</span>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>生成数量</label>
+            <select v-model.number="genCount" class="select">
+              <option v-for="n in [1, 2, 3, 5, 8]" :key="n" :value="n">{{ n }} 道</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>目标难度</label>
+            <select v-model="genDifficulty" class="select">
+              <option value="">由 AI 决定</option>
+              <option :value="1">1 入门</option>
+              <option :value="2">2</option>
+              <option :value="3">3</option>
+              <option :value="4">4</option>
+              <option :value="5">5 困难</option>
+            </select>
+          </div>
+        </div>
+        <div v-if="genResult" class="gen-result">
+          <div class="list-sub">
+            请求 {{ genResult.requested }} 道，生成 {{ genResult.generated }} 道，
+            跳过 {{ genResult.skipped }} 道（重复或为空）。
+          </div>
+          <div v-for="item in genResult.items" :key="item.id" class="gen-item">
+            <div style="font-weight: 500">{{ item.stem }}</div>
+            <div class="list-sub">
+              {{ item.suggested_meta?.category_path || '未分类' }} ·
+              难度 {{ item.suggested_meta?.difficulty ?? '—' }} ·
+              置信度 {{ Math.round((item.parse_confidence ?? 0) * 100) }}%
+            </div>
+            <div class="suggestion-text">{{ item.answer }}</div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn ghost" @click="genOpen = false">关闭</button>
+          <button
+            v-if="genResult?.generated"
+            class="btn green"
+            @click="goPending"
+          >前往待审区审核</button>
+          <button class="btn" :disabled="genLoading" @click="generateQuestions(detail)">
+            {{ genLoading ? '生成中，可能需要数十秒…' : '开始生成' }}
+          </button>
+        </div>
+      </template>
+    </Modal>
   </div>
 </template>
+
+<style scoped>
+.gen-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+.gen-item {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+</style>
